@@ -2,6 +2,8 @@
    五班英语角 · 空保执勤英语 —— style.css
    视觉语言：深藏青 + 金色点缀（安保权威感）+ 清爽卡片信息层
 =========================================================== */
+.speakable{cursor:pointer;}
+.speakable:active{opacity:.6;}
 :root{
   --navy-950:#0a1830; --navy-900:#0f2544; --navy-800:#16324f; --navy-700:#1d3f63;
   --gold:#d4af37; --gold-light:#f2d27a; --gold-dark:#a8842a;
@@ -311,6 +313,30 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .sec-cat .nm{font-size:14px;font-weight:700;}
 .sec-cat .en{font-size:11px;color:var(--muted);}
 .badge-cnt{font-size:11px;color:var(--gold-dark);background:#fff6e0;border-radius:20rem;padding:4rem 12rem;font-weight:700;}
+
+/* ---------- 安装横幅 & iOS 引导弹窗 ---------- */
+.install-banner{display:flex;align-items:center;gap:14rem;background:linear-gradient(135deg,var(--navy-900),var(--navy-950));
+  border-radius:20rem;padding:18rem 20rem;margin-bottom:20rem;box-shadow:var(--shadow-md);position:relative;}
+.install-banner-ic{width:40rem;height:40rem;flex-shrink:0;border-radius:12rem;background:rgba(212,175,55,.18);
+  display:flex;align-items:center;justify-content:center;color:var(--gold-light);}
+.install-banner-ic svg{width:22rem;height:22rem;}
+.install-banner-text{flex:1;display:flex;flex-direction:column;gap:3rem;color:#fff;min-width:0;}
+.install-banner-text b{font-size:13px;}
+.install-banner-text span{font-size:11px;color:rgba(255,255,255,.65);}
+.install-banner-btn{flex-shrink:0;background:linear-gradient(135deg,var(--gold-light),var(--gold-dark));color:var(--navy-950);
+  border:none;border-radius:14rem;padding:12rem 18rem;font-size:12px;font-weight:800;}
+.install-banner-close{position:absolute;top:8rem;right:10rem;color:rgba(255,255,255,.5);font-size:16px;line-height:1;padding:6rem;}
+.modal-mask{position:fixed;inset:0;background:rgba(10,15,30,.55);display:flex;align-items:center;justify-content:center;
+  z-index:999;padding:24rem;}
+.modal-card{background:#fff;border-radius:26rem;padding:32rem 28rem;max-width:360rem;width:100%;box-shadow:var(--shadow-md);}
+.modal-title{font-size:17px;font-weight:800;color:var(--navy-950);margin-bottom:22rem;text-align:center;}
+.modal-step{display:flex;align-items:flex-start;gap:16rem;margin-bottom:20rem;}
+.modal-step-ic{width:38rem;height:38rem;flex-shrink:0;border-radius:12rem;background:#fff6e0;color:var(--gold-dark);
+  display:flex;align-items:center;justify-content:center;}
+.modal-step-ic svg{width:20rem;height:20rem;}
+.modal-step-txt b{font-size:13px;color:var(--text);}
+.modal-step-sub{font-size:11px;color:var(--muted);margin-top:3rem;line-height:1.5;}
+.modal-card .btn{margin-top:6rem;}
 .qa-item{background:#fff;border-radius:18rem;box-shadow:var(--shadow-sm);padding:22rem 24rem;margin-bottom:16rem;}
 .qa-q{display:flex;gap:12rem;}
 .qa-a{display:flex;gap:12rem;margin-top:14rem;padding-top:14rem;border-top:1rem dashed var(--line);}

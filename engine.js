@@ -204,7 +204,7 @@ function refreshLesson(){ refresh(); }
 function renderChoiceExercise(ex){
   return `<div class="ex-card">
     <div class="ex-kicker">选择题 · ${ex.mode==='en2cn'?'看英文选中文':'看中文选英文'}</div>
-    <div class="ex-q">${esc(ex.q)}</div>
+    <div class="ex-q${ex.mode==='en2cn'?' speakable':''}" ${ex.mode==='en2cn'?`onclick="speak(${jsAttr(ex.q)})"`:''}>${esc(ex.q)}</div>
     ${ex.ph?`<div class="ex-sub">${esc(ex.ph)} <span onclick="speak(${jsAttr(ex.word.word)})">🔊</span></div>`:''}
   </div>
   <div id="exOpts">${ex.opts.map((o,i)=>`<div class="ex-opt" onclick="answerChoice(${i})"><span class="idx">${'ABCD'[i]}</span><span>${esc(o)}</span></div>`).join('')}</div>`;
@@ -213,6 +213,7 @@ function answerChoice(i){
   const ex = lessonSession.exercises[lessonSession.idx];
   if(ex.answered) return; ex.answered=true;
   const opt = ex.opts[i];
+  if(ex.mode==='cn2en') speak(opt);
   const ok = opt===ex.answer;
   document.querySelectorAll('#exOpts .ex-opt').forEach((el,idx)=>{
     if(ex.opts[idx]===ex.answer) el.classList.add('correct');
@@ -290,6 +291,7 @@ function tapMatch(side, i){
   const ex = lessonSession.exercises[lessonSession.idx];
   const item = side==='left'?ex.left[i]:ex.right[i];
   if(ex.matched.includes(item.pid)) return;
+  if(side==='left') speak(item.text);
   if(side==='left') ex.selLeft = i; else ex.selRight = i;
   refresh();
   if(ex.selLeft!=null && ex.selRight!=null){
@@ -321,6 +323,7 @@ function renderOrderExercise(ex){
 function placeToken(i){
   const ex = lessonSession.exercises[lessonSession.idx];
   const t = ex.shuffled[i];
+  speak(t);
   ex.placed.push(t);
   ex.shuffled.splice(i,1);
   refresh();
@@ -356,6 +359,7 @@ function renderScenarioExercise(ex){
 function answerScenario(i){
   const ex = lessonSession.exercises[lessonSession.idx];
   if(ex.answered) return; ex.answered=true;
+  speak(ex.opts[i]);
   const ok = ex.opts[i]===ex.answer;
   document.querySelectorAll('#exOpts .ex-opt').forEach((el,idx)=>{
     if(ex.opts[idx]===ex.answer) el.classList.add('correct');
@@ -489,6 +493,7 @@ function pickStoryChoice(i){
   const s = storySession;
   const node = s.scenario.nodes[s.nodeId];
   const c = node.choices[i];
+  speak(c.en);
   s.picked = i;
   if(!c.correct) s.hearts = Math.max(0, s.hearts-1);
   refresh();

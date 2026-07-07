@@ -109,6 +109,7 @@ function renderHome(){
     week+=`<div class="week-day ${done?'done':''} ${today?'today':''}"><span class="week-label">${'一二三四五六日'[i]}</span><div class="week-dot">${done?icon('check'):''}</div></div>`; }
   return `
   <div class="view">
+    ${installBannerHtml()}
     <div class="welcome-card">
       <div class="welcome-top">
         <div class="welcome-user">
@@ -233,7 +234,7 @@ function renderFlash(){
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
     <div class="flash" onclick="revealWord()">
       <span class="flash-cat">${esc(w.category||'词汇')}</span>
-      <div class="flash-word">${esc(w.word)}</div>
+      <div class="flash-word speakable" onclick="event.stopPropagation();speak(${jsAttr(w.word)})">${esc(w.word)}</div>
       <div class="flash-ph">${esc(w.phonetic||'')}</div>
       <div class="flash-play" onclick="event.stopPropagation();speak(${jsAttr(w.word)})">🔊</div>
       ${ s.revealed ? `<div class="flash-reveal">
@@ -270,7 +271,7 @@ function openSpeakCat(i){
   navigate(()=>{
     let html=`<div class="view">`;
     c.list.forEach(it=>{ html+=`<div class="list-item">
-      <div class="li-main"><div class="li-en">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div>
+      <div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div>
       <div class="play" onclick="speak(${jsAttr(it.en)})">🔊</div></div>`; });
     return html+'<div class="safe"></div></div>';
   }, c.category, '');
@@ -296,7 +297,7 @@ function openDialogueItem(i,j){
       const cn = t.textCn||t.cn||'';
       html+=`<div class="bubble ${left?'left':'right'}">
         <div class="role-tag">${esc(roleName(t.role))}</div>
-        <div>${esc(t.text||t.en)}</div>${cn?`<div class="cn">${esc(cn)}</div>`:''}
+        <div class="speakable" onclick="speak(${jsAttr(t.text||t.en)})">${esc(t.text||t.en)}</div>${cn?`<div class="cn">${esc(cn)}</div>`:''}
         <div class="b-play" onclick="speak(${jsAttr(t.text||t.en)})">🔊</div></div>`;
     });
     return html+'<div class="safe"></div></div>';
@@ -350,7 +351,7 @@ function renderQuizPlay(){
   return `<div class="view">
     <div class="progress-txt"><span>第 ${quiz.idx+1} / ${quiz.questions.length} 题</span><span>✓ ${quiz.correct}</span></div>
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
-    <div class="quiz-q"><div class="qw">${esc(q.q)}</div>${q.ph?`<div class="qp">${esc(q.ph)} <span onclick="speak(${jsAttr(q.target.word)})">🔊</span></div>`:''}</div>
+    <div class="quiz-q"><div class="qw${quiz.mode==='en2cn'?' speakable':''}" ${quiz.mode==='en2cn'?`onclick="speak(${jsAttr(q.q)})"`:''}>${esc(q.q)}</div>${q.ph?`<div class="qp">${esc(q.ph)} <span onclick="speak(${jsAttr(q.target.word)})">🔊</span></div>`:''}</div>
     ${q.opts.map((o,i)=>{ let cls=''; if(quiz.answered){ if(o.correct)cls='correct'; else if(i===quiz.picked)cls='wrong'; }
       return `<div class="quiz-opt ${cls}" onclick="quizPick(${i})"><span class="idx">${'ABCD'[i]}</span><span>${esc(o.text)}</span></div>`; }).join('')}
     ${quiz.answered?`<button class="btn gold" onclick="quizNext()">${quiz.idx<quiz.questions.length-1?'下一题':'查看结果'}</button>`:''}
@@ -360,6 +361,7 @@ function renderQuizPlay(){
 function quizPick(i){
   if(quiz.answered) return; quiz.answered=true; quiz.picked=i;
   const q=quiz.questions[quiz.idx];
+  if(quiz.mode==='cn2en') speak(q.opts[i].text);
   if(q.opts[i].correct){ quiz.correct++; } else { quiz.wrong.push(q.target);
     const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===q.target.word)){ arr.push(q.target); LS.set('wrongWords',arr); } }
   const set=new Set(LS.get('studiedWords',[])); set.add(q.target.word); LS.set('studiedWords',[...set]);
@@ -411,14 +413,14 @@ function openSecCat(pi,ci){
       if(it.type==='dialogue'){
         html+=`<div class="part-title">${esc(it.title||'对话')}</div>`;
         it.turns.forEach(t=>{ const isQ=t.speaker==='Q';
-          html+=`<div class="bubble ${isQ?'left':'right'}"><div class="role-tag">${esc(t.role||t.speaker)}</div><div>${esc(t.en)}</div>${t.cn?`<div class="cn">${esc(t.cn)}</div>`:''}<div class="b-play" onclick="speak(${jsAttr(t.en)})">🔊</div></div>`; });
+          html+=`<div class="bubble ${isQ?'left':'right'}"><div class="role-tag">${esc(t.role||t.speaker)}</div><div class="speakable" onclick="speak(${jsAttr(t.en)})">${esc(t.en)}</div>${t.cn?`<div class="cn">${esc(t.cn)}</div>`:''}<div class="b-play" onclick="speak(${jsAttr(t.en)})">🔊</div></div>`; });
       } else if(it.type==='qa'){
         html+=`<div class="qa-item">
-          <div class="qa-q"><div class="qa-badge q">Q</div><div class="li-main"><div class="li-en">${esc(it.q.en)}</div><div class="li-cn">${esc(it.q.cn)}</div></div><div class="play" onclick="speak(${jsAttr(it.q.en)})">🔊</div></div>
-          ${it.a&&(it.a.en||it.a.cn)?`<div class="qa-a"><div class="qa-badge a">A</div><div class="li-main"><div class="li-en">${esc(it.a.en)}</div><div class="li-cn">${esc(it.a.cn)}</div></div>${it.a.en?`<div class="play" onclick="speak(${jsAttr(it.a.en)})">🔊</div>`:''}</div>`:''}
+          <div class="qa-q"><div class="qa-badge q">Q</div><div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.q.en)})">${esc(it.q.en)}</div><div class="li-cn">${esc(it.q.cn)}</div></div><div class="play" onclick="speak(${jsAttr(it.q.en)})">🔊</div></div>
+          ${it.a&&(it.a.en||it.a.cn)?`<div class="qa-a"><div class="qa-badge a">A</div><div class="li-main"><div class="li-en${it.a.en?' speakable':''}" ${it.a.en?`onclick="speak(${jsAttr(it.a.en)})"`:''}>${esc(it.a.en)}</div><div class="li-cn">${esc(it.a.cn)}</div></div>${it.a.en?`<div class="play" onclick="speak(${jsAttr(it.a.en)})">🔊</div>`:''}</div>`:''}
         </div>`;
       } else {
-        html+=`<div class="list-item"><div class="li-main"><div class="li-en">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div><div class="play" onclick="speak(${jsAttr(it.en)})">🔊</div></div>`;
+        html+=`<div class="list-item"><div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div><div class="play" onclick="speak(${jsAttr(it.en)})">🔊</div></div>`;
       }
     });
     return html+'<div class="safe"></div></div>';
@@ -434,7 +436,7 @@ function renderChat(){
   let html=`<div class="view" style="padding-bottom:120rem"><div class="chat-wrap">`;
   chatLog.forEach(m=>{
     html+=`<div class="chat-msg ${m.from}">${m.text.split('\n').map(esc).join('<br>')}`;
-    if(m.results){ m.results.forEach(r=>{ html+=`<div class="chat-result"><div class="li-en">${esc(r.en)} <span onclick="speak(${jsAttr(r.en)})">🔊</span></div><div class="li-cn">${esc(r.cn)}</div></div>`; }); }
+    if(m.results){ m.results.forEach(r=>{ html+=`<div class="chat-result"><div class="li-en speakable" onclick="speak(${jsAttr(r.en)})">${esc(r.en)} 🔊</div><div class="li-cn">${esc(r.cn)}</div></div>`; }); }
     html+=`</div>`;
   });
   html+=`</div></div>
@@ -520,15 +522,43 @@ window.addEventListener('beforeinstallprompt', e=>{
   deferredInstallPrompt=e;
   if(curTab==='me') refresh();
 });
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 function installApp(){
   if(deferredInstallPrompt){
     deferredInstallPrompt.prompt();
     deferredInstallPrompt.userChoice.then(()=>{ deferredInstallPrompt=null; refresh(); });
-  }else if(/iPad|iPhone|iPod/.test(navigator.userAgent)){
-    alert('iPhone / iPad 安装方法：\n1. 用 Safari 浏览器打开本站\n2. 点击底部「分享」按钮\n3. 选择「添加到主屏幕」\n\n添加后即可像App一样打开，没有网络也能使用。');
+  }else if(isIOS()){
+    showIOSInstallGuide();
   }else{
     toast('当前浏览器已自动缓存本站，也可在浏览器菜单中查找"安装应用"选项');
   }
 }
+function closeIOSGuide(){ const m=document.getElementById('iosGuideMask'); if(m) m.remove(); }
+function showIOSInstallGuide(){
+  if(document.getElementById('iosGuideMask')) return;
+  const div=document.createElement('div');
+  div.id='iosGuideMask';
+  div.className='modal-mask';
+  div.onclick=function(e){ if(e.target===div) closeIOSGuide(); };
+  div.innerHTML=`<div class="modal-card">
+    <div class="modal-title">3步添加到主屏幕</div>
+    <div class="modal-step"><div class="modal-step-ic">${icon('share')}</div><div class="modal-step-txt"><b>1. 点击底部工具栏「分享」</b><div class="modal-step-sub">方框加向上箭头的图标</div></div></div>
+    <div class="modal-step"><div class="modal-step-ic">${icon('addbox')}</div><div class="modal-step-txt"><b>2. 找到「添加到主屏幕」</b><div class="modal-step-sub">没看到就在弹出菜单里下滑查找</div></div></div>
+    <div class="modal-step"><div class="modal-step-ic">${icon('check')}</div><div class="modal-step-txt"><b>3. 点右上角「添加」</b><div class="modal-step-sub">主屏幕出现图标后，离线也能直接打开</div></div></div>
+    <button class="btn gold" onclick="closeIOSGuide()">知道了</button>
+  </div>`;
+  document.body.appendChild(div);
+}
+function installBannerHtml(){
+  if(isStandalone() || LS.get('installBannerDismissed',false)) return '';
+  const ios=isIOS();
+  return `<div class="install-banner">
+    <div class="install-banner-ic">${icon('plane')}</div>
+    <div class="install-banner-text"><b>${ios?'一步添加到主屏幕':'安装到手机桌面'}</b><span>离线可用 · 进度自动保存</span></div>
+    <button class="install-banner-btn" onclick="installApp()">${ios?'查看步骤':'安装'}</button>
+    <span class="install-banner-close" onclick="dismissInstallBanner(event)">×</span>
+  </div>`;
+}
+function dismissInstallBanner(e){ if(e){ e.stopPropagation(); } LS.set('installBannerDismissed',true); refresh(); }
 window.addEventListener('online', ()=>{ toast('网络已恢复'); if(curTab==='me') refresh(); });
 window.addEventListener('offline', ()=>{ toast('已离线 · 可继续学习，进度会保存在本机'); if(curTab==='me') refresh(); });

@@ -40,7 +40,9 @@ const ICONS = {
   bank:'<path d="M3 10l9-6 9 6"/><path d="M5 10v9M10 10v9M14 10v9M19 10v9"/><path d="M3 21h18"/>',
   wifi:'<path d="M5 13a11 11 0 0 1 14 0"/><path d="M8.5 16.5a6 6 0 0 1 7 0"/><path d="M12 20h.01"/>',
   gavel:'<path d="M13 5l6 6-3 3-6-6z"/><path d="M4 21l7-7"/><path d="M12 15l3-3"/>',
-  compass:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-6 2 2-6z"/>'
+  compass:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-6 2 2-6z"/>',
+  share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/>',
+  addbox:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/>'
 };
 function icon(name, cls){
   const p = ICONS[name] || ICONS.star;
