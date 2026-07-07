@@ -521,3 +521,4 @@ function renderStoryEnd(sc){
 /* ---------- boot (放在最后，确保所有数据/函数已加载) ---------- */
 buildTabbar();
 switchTab('home');
+initSpeedControl();
