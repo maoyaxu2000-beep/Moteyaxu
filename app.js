@@ -475,6 +475,14 @@ function renderMe(){
       <div class="welcome-avatar" style="background:linear-gradient(135deg,var(--navy-800),var(--navy-950));color:#fff">${esc((name[0]||'游'))}</div>
       <div><div style="font-size:16px;font-weight:800">${esc(name||'游客')}</div><div style="font-size:12px;color:var(--muted)">五班英语角 · 空保英语 · Lv.${level}</div></div>
     </div>
+    <div class="card" style="margin-top:20rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12rem">
+        <div style="display:flex;align-items:center;gap:10rem"><div class="status-dot ${navigator.onLine?'done':''}"></div><span style="font-size:13px;font-weight:700">${navigator.onLine?'当前在线':'当前离线'}</span></div>
+        <span class="badge-cnt">支持离线使用</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:${isStandalone()?'0':'14rem'}">全部单词、闯关关卡、情景剧本已缓存到本机；打卡、经验值、生词本等学习进度均保存在本机，没有信号也能继续学习。</div>
+      ${isStandalone()? '' : `<button class="btn gold" onclick="installApp()">安装到主屏幕，随时离线打开</button>`}
+    </div>
     <div class="daily-list" style="margin-top:20rem;grid-template-columns:repeat(3,1fr);">
       <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
       <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--gold-dark)">${xp}</div><div style="font-size:11px;color:var(--muted)">经验值</div></div>
@@ -499,3 +507,28 @@ function resetCheckin(){ if(confirm('确定重置全部打卡记录？')){ LS.se
 function resetProgress(){ if(confirm('确定重置闯关地图进度与经验值？')){ LS.set('lessonProgress',{}); LS.set('storyProgress',{}); LS.set('xp',0); toast('已重置'); refresh(); } }
 function clearWrong(){ if(confirm('确定清空生词本？')){ LS.set('wrongWords',[]); toast('已清空'); refresh(); } }
 function aboutApp(){ alert('五班英语角 · 空保英语\n\n民航安保执勤英语学习应用（闯关升级版）\n背单词参考多邻国式关卡设计，内含500+执勤词汇、情景闯关剧本与空保英语专题\n\n离线可用 · 数据存储于本机'); }
+
+/* =========================================================
+   PWA：离线缓存状态 / 添加到主屏幕
+========================================================= */
+let deferredInstallPrompt=null;
+function isStandalone(){
+  return window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+}
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredInstallPrompt=e;
+  if(curTab==='me') refresh();
+});
+function installApp(){
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(()=>{ deferredInstallPrompt=null; refresh(); });
+  }else if(/iPad|iPhone|iPod/.test(navigator.userAgent)){
+    alert('iPhone / iPad 安装方法：\n1. 用 Safari 浏览器打开本站\n2. 点击底部「分享」按钮\n3. 选择「添加到主屏幕」\n\n添加后即可像App一样打开，没有网络也能使用。');
+  }else{
+    toast('当前浏览器已自动缓存本站，也可在浏览器菜单中查找"安装应用"选项');
+  }
+}
+window.addEventListener('online', ()=>{ toast('网络已恢复'); if(curTab==='me') refresh(); });
+window.addEventListener('offline', ()=>{ toast('已离线 · 可继续学习，进度会保存在本机'); if(curTab==='me') refresh(); });
