@@ -23,12 +23,13 @@ function pickVoice(){
          || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || null;
 }
 if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function speechRate(){ return LS.get('speechRate',.85); }
 function speak(text,lang){
   if(!('speechSynthesis' in window)){ toast('当前设备不支持朗读'); return; }
   try{
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
-    u.lang=lang||'en-US'; u.rate=.92; u.pitch=1;
+    u.lang=lang||'en-US'; u.rate=speechRate(); u.pitch=1;
     if(!lang||lang==='en-US'){ if(enVoice) u.voice=enVoice; }
     speechSynthesis.speak(u);
   }catch(e){ toast('朗读失败'); }
@@ -307,7 +308,7 @@ function roleName(r){ return {officer:'安全员',passenger:'旅客',A:'A',B:'B'
 function speakAllDialogue(i,j){
   const d=DIALOGUES[i].list[j]; let k=0;
   speechSynthesis.cancel();
-  (function next(){ if(k>=d.dialogue.length) return; const t=d.dialogue[k++]; const u=new SpeechSynthesisUtterance(t.text||t.en); u.lang='en-US'; if(enVoice)u.voice=enVoice; u.rate=.92; u.onend=()=>setTimeout(next,250); speechSynthesis.speak(u); })();
+  (function next(){ if(k>=d.dialogue.length) return; const t=d.dialogue[k++]; const u=new SpeechSynthesisUtterance(t.text||t.en); u.lang='en-US'; if(enVoice)u.voice=enVoice; u.rate=speechRate(); u.onend=()=>setTimeout(next,250); speechSynthesis.speak(u); })();
 }
 
 /* =========================================================
@@ -562,3 +563,30 @@ function installBannerHtml(){
 function dismissInstallBanner(e){ if(e){ e.stopPropagation(); } LS.set('installBannerDismissed',true); refresh(); }
 window.addEventListener('online', ()=>{ toast('网络已恢复'); if(curTab==='me') refresh(); });
 window.addEventListener('offline', ()=>{ toast('已离线 · 可继续学习，进度会保存在本机'); if(curTab==='me') refresh(); });
+
+/* =========================================================
+   全局朗读语速控制（悬浮按钮，任意页面可调）
+========================================================= */
+function setSpeechRate(v){
+  LS.set('speechRate', Math.round(Number(v)*100)/100);
+  const lab=document.getElementById('speedFabLabel'); if(lab) lab.textContent=speechRate().toFixed(2)+'x';
+  const val=document.getElementById('speedVal'); if(val) val.textContent=speechRate().toFixed(2)+'x';
+}
+function toggleSpeedPanel(){ const p=document.getElementById('speedPanel'); if(p) p.classList.toggle('open'); }
+function speedTest(){ speak('Please show your boarding pass and ID.'); }
+function initSpeedControl(){
+  if(document.getElementById('speedFab')) return;
+  const rate=speechRate();
+  const wrap=document.createElement('div');
+  wrap.className='speed-widget-wrap';
+  wrap.innerHTML=`
+    <div class="speed-panel" id="speedPanel">
+      <div class="speed-panel-head"><span>朗读语速</span><span id="speedVal">${rate.toFixed(2)}x</span></div>
+      <input type="range" id="speedSlider" min="0.5" max="1.15" step="0.05" value="${rate}" oninput="setSpeechRate(this.value)">
+      <div class="speed-panel-labels"><span>慢速</span><span>正常语速</span></div>
+      <button class="btn ghost" style="margin-top:14rem;padding:16rem;font-size:13px;" onclick="speedTest()">${icon('speaker')} 试听效果</button>
+    </div>
+    <div class="speed-fab" id="speedFab" onclick="toggleSpeedPanel()">${icon('speaker')}<span id="speedFabLabel">${rate.toFixed(2)}x</span></div>
+  `;
+  document.body.appendChild(wrap);
+}

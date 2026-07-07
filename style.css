@@ -350,6 +350,21 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .toast.show{opacity:1;}
 .safe{height:40rem;}
 
+/* ---------- 全局语速悬浮控件 ---------- */
+.speed-widget-wrap{position:fixed;left:0;right:0;bottom:calc(82rem + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;z-index:60;
+  pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;gap:12rem;padding-right:18rem;}
+.speed-fab{pointer-events:auto;background:linear-gradient(135deg,var(--navy-800),var(--navy-950));color:#fff;
+  border-radius:30rem;padding:12rem 18rem;display:flex;align-items:center;gap:8rem;box-shadow:var(--shadow-md);
+  font-size:12px;font-weight:800;}
+.speed-fab svg{width:18rem;height:18rem;}
+.speed-panel{pointer-events:none;background:#fff;border-radius:20rem;box-shadow:var(--shadow-md);padding:22rem 24rem;
+  width:250rem;transform:translateY(10px) scale(.95);opacity:0;transition:.18s;}
+.speed-panel.open{pointer-events:auto;transform:translateY(0) scale(1);opacity:1;}
+.speed-panel-head{display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--navy-950);margin-bottom:12rem;}
+.speed-panel input[type=range]{width:100%;}
+.speed-panel-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6rem;}
+.speed-panel .btn svg{width:14rem;height:14rem;vertical-align:-2rem;margin-right:4rem;}
+
 /* chat */
 .chat-wrap{display:flex;flex-direction:column;gap:16rem;}
 .chat-msg{max-width:82%;padding:18rem 22rem;border-radius:20rem;font-size:14px;}
