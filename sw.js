@@ -1,6 +1,8 @@
 /* 离线缓存 service worker */
-const CACHE = 'wuban-english-v1';
-const ASSETS = ['./','./index.html','./app.js','./data.js','./icon.svg','./manifest.webmanifest'];
+const CACHE = 'wuban-english-v2';
+const ASSETS = ['./','./index.html','./style.css','./icons.js','./app.js','./engine.js',
+  './data.core.js','./data.units.js','./data.content.js','./data.scenarios.js',
+  './icon.svg','./manifest.webmanifest'];
 self.addEventListener('install', e=>{
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));

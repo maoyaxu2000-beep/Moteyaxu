@@ -1,4 +1,8 @@
-/* 五班英语角 App 逻辑 */
+/* ===========================================================
+   五班英语角 · 空保执勤英语 —— app.js
+   核心导航 / 首页 / 自由学习(单词卡+测试) / 口语 / 情景对话 /
+   空保英语专题 / 答疑小助手 / 我的 / 打卡
+=========================================================== */
 'use strict';
 const WORDS = window.DATA.words, SPEAKING = window.DATA.speaking,
       DIALOGUES = window.DATA.dialogues, SECURITY = window.DATA.security;
@@ -9,6 +13,7 @@ const LS = {
   set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
 function dateStr(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`; }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 /* ---------- TTS ---------- */
 let enVoice=null;
@@ -29,7 +34,6 @@ function speak(text,lang){
   }catch(e){ toast('朗读失败'); }
 }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-/* 生成可安全放入双引号 HTML 属性的单引号 JS 字符串字面量 */
 function jsAttr(s){ return "'"+String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+"'"; }
 
 /* ---------- toast ---------- */
@@ -39,9 +43,10 @@ function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg
 /* ---------- navigation ---------- */
 const root=document.getElementById('root');
 let curTab='home';
-let stack=[]; // {render, title, sub, act}
-const baseView={ home:renderHome, words:renderWordsMenu, speaking:renderSpeaking, security:renderSecurity, me:renderMe };
-const tabTitle={ home:'五班英语角', words:'背单词', speaking:'情景口语', security:'空保英语', me:'我的' };
+let stack=[];
+const baseView={ home:renderHome, words:function(){ return renderMap(); }, speaking:renderSpeaking, security:renderSecurity, me:renderMe };
+const tabTitle={ home:'五班英语角', words:'闯关地图', speaking:'情景口语', security:'空保英语', me:'我的' };
+const tabIcon={ home:'home', words:'book', speaking:'talk', security:'shield', me:'user' };
 
 function switchTab(tab){
   curTab=tab;
@@ -49,7 +54,7 @@ function switchTab(tab){
   stack=[{ render:baseView[tab], title:tabTitle[tab], sub:false, act:'' }];
   paint();
 }
-function navigate(render, title, act){ // render returns html string
+function navigate(render, title, act){
   stack.push({render, title, sub:true, act}); paint();
 }
 function goBack(){ if(stack.length>1){ stack.pop(); paint(); } }
@@ -63,6 +68,12 @@ function paint(){
   document.getElementById('topAct').innerHTML = cur.act || '';
   document.getElementById('tabbar').style.display = cur.sub? 'none':'flex';
   window.scrollTo(0,0);
+}
+function buildTabbar(){
+  const tb = document.getElementById('tabbar');
+  tb.innerHTML = ['home','words','speaking','security','me'].map(t=>
+    `<div class="tab ${t==='home'?'active':''}" data-tab="${t}" onclick="switchTab('${t}')"><span class="ic">${icon(tabIcon[t])}</span>${tabTitle[t]==='五班英语角'?'首页':tabTitle[t]}</div>`
+  ).join('');
 }
 
 /* =========================================================
@@ -88,13 +99,14 @@ function renderHome(){
   const st=calcStreak();
   const name=LS.get('displayName','')||'同学';
   const studied=LS.get('studiedWords',[]).length;
+  const xp = (typeof totalXP==='function') ? totalXP() : 0;
+  const level = (typeof userLevel==='function') ? userLevel() : 1;
   const {w,p}=dailyPick();
   const now=new Date(); const wd=['日','一','二','三','四','五','六'][now.getDay()];
-  // week
   const hist=LS.get('checkinHistory',[]); const monday=new Date(now); const dow=now.getDay(); monday.setDate(now.getDate()+(dow===0?-6:1-dow));
   let week='';
   for(let i=0;i<7;i++){ const d=new Date(monday); d.setDate(monday.getDate()+i); const ds=dateStr(d); const done=hist.includes(ds); const today=ds===st.today;
-    week+=`<div class="week-day ${done?'done':''} ${today?'today':''}"><span class="week-label">${'一二三四五六日'[i]}</span><div class="week-dot">${done?'✓':''}</div></div>`; }
+    week+=`<div class="week-day ${done?'done':''} ${today?'today':''}"><span class="week-label">${'一二三四五六日'[i]}</span><div class="week-dot">${done?icon('check'):''}</div></div>`; }
   return `
   <div class="view">
     <div class="welcome-card">
@@ -102,7 +114,7 @@ function renderHome(){
         <div class="welcome-user">
           <div class="welcome-avatar">${esc((name[0]||'游'))}</div>
           <div><div class="welcome-greeting">${greeting()}，${esc(name)}</div>
-            <div class="welcome-status"><div class="status-dot ${st.checked?'done':''}"></div><span>${st.checked?'今日已打卡':'今日未打卡'}</span></div>
+            <div class="welcome-status"><div class="status-dot ${st.checked?'done':''}"></div><span>${st.checked?'今日已打卡':'今日未打卡'} · Lv.${level}</span></div>
           </div>
         </div>
         <div class="welcome-date"><span class="date-day">${String(now.getDate()).padStart(2,'0')}</span><span class="date-week">星期${wd}</span></div>
@@ -110,35 +122,35 @@ function renderHome(){
       <div class="welcome-stats">
         <div class="stat-item"><span class="stat-num">${studied}</span><span class="stat-label">已学单词</span></div>
         <div class="stat-dot"></div>
-        <div class="stat-item"><span class="stat-num">${st.streak}</span><span class="stat-label">连续打卡</span></div>
+        <div class="stat-item"><span class="stat-num">${xp}</span><span class="stat-label">经验值 XP</span></div>
         <div class="stat-dot"></div>
-        <div class="stat-item"><span class="stat-num">${st.total}</span><span class="stat-label">累计天数</span></div>
+        <div class="stat-item"><span class="stat-num">${st.streak}</span><span class="stat-label">连续打卡</span></div>
       </div>
     </div>
 
     <div class="quick-grid">
-      <div class="quick-item" onclick="switchTab('words')"><div class="quick-icon" style="background:linear-gradient(135deg,#4ade80,#22c55e)">W</div><span class="quick-name">背单词</span><span class="quick-desc">高频词汇</span></div>
-      <div class="quick-item" onclick="openReview()"><div class="quick-icon" style="background:linear-gradient(135deg,#fb923c,#f97316)">R</div><span class="quick-name">生词本</span><span class="quick-desc">错题复习</span></div>
-      <div class="quick-item" onclick="switchTab('speaking')"><div class="quick-icon" style="background:linear-gradient(135deg,#60a5fa,#3b82f6)">S</div><span class="quick-name">口语</span><span class="quick-desc">情景练习</span></div>
-      <div class="quick-item" onclick="openQuiz()"><div class="quick-icon" style="background:linear-gradient(135deg,#f472b6,#ec4899)">Q</div><span class="quick-name">测试</span><span class="quick-desc">检验成果</span></div>
+      <div class="quick-item" onclick="switchTab('words')"><div class="quick-icon" style="background:linear-gradient(135deg,#4ade80,#22c55e)">${icon('book')}</div><span class="quick-name">闯关地图</span><span class="quick-desc">6种题型</span></div>
+      <div class="quick-item" onclick="openStoryList()"><div class="quick-icon" style="background:linear-gradient(135deg,#f87171,#b91c1c)">${icon('alert')}</div><span class="quick-name">情景剧本</span><span class="quick-desc">真实特情</span></div>
+      <div class="quick-item" onclick="switchTab('speaking')"><div class="quick-icon" style="background:linear-gradient(135deg,#60a5fa,#3b82f6)">${icon('talk')}</div><span class="quick-name">口语</span><span class="quick-desc">情景练习</span></div>
+      <div class="quick-item" onclick="openReview()"><div class="quick-icon" style="background:linear-gradient(135deg,#f472b6,#ec4899)">${icon('star')}</div><span class="quick-name">生词本</span><span class="quick-desc">错题复习</span></div>
     </div>
 
     <div class="section">
       <div class="section-head"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">探索更多</span></div><span class="section-sub">更多学习方式</span></div>
       <div class="func-card">
         <div class="func-item" onclick="switchTab('security')">
-          <div class="func-icon" style="background:linear-gradient(135deg,#1e3a5f,#1a5276 50%,#1a7f37);color:#fff">🛡</div>
+          <div class="func-icon" style="background:linear-gradient(135deg,#1e3a5f,#1a5276 50%,#0f2544)">${icon('shield')}</div>
           <div class="func-info"><span class="func-name">空保英语</span><span class="func-desc">民航安保执勤英语，境外场景交流</span></div>
           <div class="func-badge">NEW</div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="openChat()">
-          <div class="func-icon" style="background:linear-gradient(135deg,#a78bfa,#7c3aed 50%,#6366f1);color:#fff">🤖</div>
+          <div class="func-icon" style="background:linear-gradient(135deg,#a78bfa,#7c3aed 50%,#6366f1)">${icon('robot')}</div>
           <div class="func-info"><span class="func-name">答疑小助手</span><span class="func-desc">本地智能检索，单词短句随时查</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="openDialogue()">
-          <div class="func-icon" style="background:linear-gradient(135deg,#2dd4bf,#0d9488 50%,#0891b2);color:#fff">💬</div>
+          <div class="func-icon" style="background:linear-gradient(135deg,#2dd4bf,#0d9488 50%,#0891b2)">${icon('drama')}</div>
           <div class="func-info"><span class="func-name">情景对话</span><span class="func-desc">模拟真实场景，开口说英语</span></div><span class="func-arrow">›</span>
         </div>
       </div>
@@ -148,14 +160,14 @@ function renderHome(){
       <div class="section-head"><div class="section-head-left"><div class="section-head-bar amber"></div><span class="section-title">每日推荐</span></div><span class="section-sub">${st.today}</span></div>
       <div class="daily-list">
         <div class="daily-card word-card" onclick="switchTab('words')">
-          <span class="daily-card-tag">📖 每日一词</span>
+          <span class="daily-card-tag">${icon('book')} 每日一词</span>
           <div class="daily-card-word">${esc(w.word)}</div>
           <div class="daily-card-phonetic">${esc(w.phonetic||'')}</div>
           <div class="daily-card-meaning">${esc(w.meaning)}</div>
           <div class="daily-card-example">${esc(w.example||'')}</div>
         </div>
         <div class="daily-card phrase-card" onclick="switchTab('speaking')">
-          <span class="daily-card-tag">💡 每日金句</span>
+          <span class="daily-card-tag">${icon('talk')} 每日金句</span>
           <div class="daily-card-en">${esc(p.en)}</div>
           <div class="daily-card-cn">${esc(p.cn)}</div>
         </div>
@@ -163,10 +175,10 @@ function renderHome(){
     </div>
 
     <div class="section">
-      <div class="section-head"><div class="section-head-left"><div class="section-head-bar green"></div><span class="section-title">本周学习</span></div>${st.streak>0?`<span class="section-sub">🔥 连续 ${st.streak} 天</span>`:''}</div>
+      <div class="section-head"><div class="section-head-left"><div class="section-head-bar green"></div><span class="section-title">本周学习</span></div>${st.streak>0?`<span class="section-sub">${icon('flame')} 连续 ${st.streak} 天</span>`:''}</div>
       <div class="checkin-card">
         <div class="week-row">${week}</div>
-        <button class="btn ${st.checked?'done':''}" onclick="doCheckin()">${st.checked?'✅ 今日已完成':'🎯 立即打卡'}</button>
+        <button class="btn ${st.checked?'done':'gold'}" onclick="doCheckin()">${st.checked?'✅ 今日已完成':'🎯 立即打卡'}</button>
       </div>
     </div>
     <div class="safe"></div>
@@ -175,13 +187,14 @@ function renderHome(){
 function doCheckin(){
   const st=calcStreak(); if(st.checked){ toast('今日已打卡'); return; }
   const hist=LS.get('checkinHistory',[]); hist.push(st.today); LS.set('checkinHistory',hist); LS.set('lastCheckinDate',st.today);
-  toast('打卡成功 🎉'); refresh();
+  if(typeof addXP==='function') addXP(15);
+  toast('打卡成功 🎉 +15 XP'); refresh();
 }
 
 /* =========================================================
-   WORDS  (背单词 / 生词本)
+   自由学习模式 WORDS  (背单词 / 生词本 / 测试) —— 保留原有自由复习方式
 ========================================================= */
-let wordSession=null; // {list, idx, revealed, mode:'study'|'review'}
+let wordSession=null;
 function wordCats(){ const s=new Set(); WORDS.forEach(w=>w.category&&s.add(w.category)); return ['全部',...s]; }
 function renderWordsMenu(){
   const cats=wordCats();
@@ -191,25 +204,24 @@ function renderWordsMenu(){
     chips+=`<div class="list-item arrow-item" onclick="startWords('${esc(c)}')"><div class="li-main"><div class="li-en">${esc(c)}</div><div class="li-cn">${cnt} 个词</div></div><span class="func-arrow">›</span></div>`; });
   return `<div class="view">
     <div class="daily-list" style="grid-template-columns:1fr 1fr;">
-      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--green)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学单词</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学单词</div></div>
       <div class="card" style="text-align:center" onclick="openReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">生词本 ›</div></div>
     </div>
-    <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">选择分类</span></div><span class="section-sub">共 ${WORDS.length} 词</span></div>
+    <button class="btn gold" style="margin-top:20rem;" onclick="openQuiz()">📝 开始单词测试</button>
+    <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">按分类闪卡复习</span></div><span class="section-sub">共 ${WORDS.length} 词</span></div>
     ${chips}
     <div class="safe"></div>
   </div>`;
 }
-function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function startWords(cat){
   const list=shuffle(cat==='全部'?WORDS:WORDS.filter(w=>w.category===cat));
   wordSession={list,idx:0,revealed:false,mode:'study',cat};
-  navigate(renderFlash, cat==='全部'?'背单词':cat, '');
+  navigate(renderFlash, cat==='全部'?'闪卡复习':cat, '');
 }
 function openReview(){
   const list=LS.get('wrongWords',[]);
   if(!list.length){ toast('生词本是空的'); }
   wordSession={list:list.slice(),idx:0,revealed:false,mode:'review',cat:'生词本'};
-  if(curTab!=='words'){ switchTab('words'); }
   navigate(renderFlash,'生词本 ('+list.length+')','');
 }
 function renderFlash(){
@@ -232,8 +244,8 @@ function renderFlash(){
     </div>
     <div class="flash-actions">
       ${reviewMode
-        ? `<button class="btn ghost" onclick="removeWrong()">✓ 已掌握移除</button><button class="btn" onclick="nextWord()">下一个 ›</button>`
-        : `<button class="btn amber" onclick="addWrong()">★ 加入生词本</button><button class="btn" onclick="markKnownNext()">认识 · 下一个</button>`}
+        ? `<button class="btn ghost" onclick="removeWrong()">✓ 已掌握移除</button><button class="btn gold" onclick="nextWord()">下一个 ›</button>`
+        : `<button class="btn amber" onclick="addWrong()">★ 加入生词本</button><button class="btn gold" onclick="markKnownNext()">认识 · 下一个</button>`}
     </div>
     <div class="safe"></div>
   </div>`;
@@ -242,16 +254,15 @@ function revealWord(){ wordSession.revealed=!wordSession.revealed; refresh(); co
 function nextWord(){ const s=wordSession; if(s.idx<s.list.length-1){ s.idx++; s.revealed=false; refresh(); } else finishWords(); }
 function markKnownNext(){ const w=wordSession.list[wordSession.idx]; const set=new Set(LS.get('studiedWords',[])); set.add(w.word); LS.set('studiedWords',[...set]); nextWord(); }
 function addWrong(){ const w=wordSession.list[wordSession.idx]; const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===w.word)){ arr.push(w); LS.set('wrongWords',arr); toast('已加入生词本'); } else toast('已在生词本中'); }
-function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); switchTab('words'); } else refresh(); }
+function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); } else refresh(); }
 function finishWords(){ toast('本组学习完成 🎉'); goBack(); }
 
 /* =========================================================
    SPEAKING (口语短句)
 ========================================================= */
-let speakShowCn=true;
 function renderSpeaking(){
   let html=`<div class="view"><div class="section-head"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">情景口语</span></div><span class="section-sub">${SPEAKING.length} 个场景</span></div>`;
-  SPEAKING.forEach((c,i)=>{ html+=`<div class="list-item arrow-item" onclick="openSpeakCat(${i})"><div class="play" style="background:#eaf2ff;color:#2563eb">💬</div><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
+  SPEAKING.forEach((c,i)=>{ html+=`<div class="list-item arrow-item" onclick="openSpeakCat(${i})"><div class="play" style="background:#eaf2ff;color:#2563eb">${icon('talk')}</div><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
   return html+'<div class="safe"></div></div>';
 }
 function openSpeakCat(i){
@@ -272,7 +283,7 @@ function openDialogue(){ navigate(renderDialogueMenu,'情景对话',''); }
 function renderDialogueMenu(){
   let html=`<div class="view">`;
   DIALOGUES.forEach((c,i)=>{ html+=`<div class="part-title">${esc(c.category)}</div>`;
-    c.list.forEach((d,j)=>{ html+=`<div class="list-item arrow-item" onclick="openDialogueItem(${i},${j})"><div class="play" style="background:#e6fbf6;color:#0d9488">🎭</div><div class="li-main"><div class="li-en">${esc(d.title)}</div><div class="li-cn">${d.dialogue.length} 句对话</div></div><span class="func-arrow">›</span></div>`; });
+    c.list.forEach((d,j)=>{ html+=`<div class="list-item arrow-item" onclick="openDialogueItem(${i},${j})"><div class="play" style="background:#e6fbf6;color:#0d9488">${icon('drama')}</div><div class="li-main"><div class="li-en">${esc(d.title)}</div><div class="li-cn">${d.dialogue.length} 句对话</div></div><span class="func-arrow">›</span></div>`; });
   });
   return html+'<div class="safe"></div></div>';
 }
@@ -291,7 +302,7 @@ function openDialogueItem(i,j){
     return html+'<div class="safe"></div></div>';
   }, d.title, '');
 }
-function roleName(r){ return {officer:'安全员',passenger:'旅客',A:'A',B:'B',Q:'问',}[r]||r; }
+function roleName(r){ return {officer:'安全员',passenger:'旅客',A:'A',B:'B',Q:'问'}[r]||r; }
 function speakAllDialogue(i,j){
   const d=DIALOGUES[i].list[j]; let k=0;
   speechSynthesis.cancel();
@@ -299,10 +310,10 @@ function speakAllDialogue(i,j){
 }
 
 /* =========================================================
-   QUIZ (测试)
+   QUIZ (单词测试 - 自由复习中的检验环节)
 ========================================================= */
 let quiz=null;
-function openQuiz(){ quiz={state:'menu',mode:'en2cn',count:10,cat:'全部'}; if(curTab!=='words'){} navigate(renderQuiz,'单词测试',''); }
+function openQuiz(){ quiz={state:'menu',mode:'en2cn',count:10,cat:'全部'}; navigate(renderQuiz,'单词测试',''); }
 function renderQuiz(){
   if(!quiz) quiz={state:'menu',mode:'en2cn',count:10,cat:'全部'};
   if(quiz.state==='menu') return renderQuizMenu();
@@ -318,7 +329,7 @@ function renderQuizMenu(){
       <div class="seg">${[5,10,15,20].map(n=>`<button class="${quiz.count===n?'active':''}" onclick="quizSet('count',${n})">${n}</button>`).join('')}</div></div>
     <div class="field"><label>词汇分类</label>
       <div class="chips">${cats.map(c=>`<div class="chip ${quiz.cat===c?'active':''}" onclick="quizSet('cat','${esc(c)}')">${esc(c)}</div>`).join('')}</div></div>
-    <button class="btn" onclick="quizStart()">开始测试</button>
+    <button class="btn gold" onclick="quizStart()">开始测试</button>
     <div class="safe"></div>
   </div>`;
 }
@@ -342,7 +353,7 @@ function renderQuizPlay(){
     <div class="quiz-q"><div class="qw">${esc(q.q)}</div>${q.ph?`<div class="qp">${esc(q.ph)} <span onclick="speak(${jsAttr(q.target.word)})">🔊</span></div>`:''}</div>
     ${q.opts.map((o,i)=>{ let cls=''; if(quiz.answered){ if(o.correct)cls='correct'; else if(i===quiz.picked)cls='wrong'; }
       return `<div class="quiz-opt ${cls}" onclick="quizPick(${i})"><span class="idx">${'ABCD'[i]}</span><span>${esc(o.text)}</span></div>`; }).join('')}
-    ${quiz.answered?`<button class="btn" onclick="quizNext()">${quiz.idx<quiz.questions.length-1?'下一题':'查看结果'}</button>`:''}
+    ${quiz.answered?`<button class="btn gold" onclick="quizNext()">${quiz.idx<quiz.questions.length-1?'下一题':'查看结果'}</button>`:''}
     <div class="safe"></div>
   </div>`;
 }
@@ -351,19 +362,18 @@ function quizPick(i){
   const q=quiz.questions[quiz.idx];
   if(q.opts[i].correct){ quiz.correct++; } else { quiz.wrong.push(q.target);
     const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===q.target.word)){ arr.push(q.target); LS.set('wrongWords',arr); } }
-  // mark studied
   const set=new Set(LS.get('studiedWords',[])); set.add(q.target.word); LS.set('studiedWords',[...set]);
   refresh();
 }
-function quizNext(){ if(quiz.idx<quiz.questions.length-1){ quiz.idx++; quiz.answered=false; quiz.picked=-1; refresh(); } else { quiz.state='result'; refresh(); } }
+function quizNext(){ if(quiz.idx<quiz.questions.length-1){ quiz.idx++; quiz.answered=false; quiz.picked=-1; refresh(); } else { quiz.state='result'; if(typeof addXP==='function') addXP(quiz.correct*5); refresh(); } }
 function renderQuizResult(){
   const total=quiz.questions.length; const score=Math.round(quiz.correct/total*100);
   return `<div class="view" style="text-align:center">
     <div class="result-ring" style="--pct:${score*3.6}deg"><div class="inner"><div class="result-score">${score}</div><div style="font-size:12px;color:var(--muted)">分</div></div></div>
-    <div style="font-size:15px;font-weight:600;margin-bottom:6rem">答对 ${quiz.correct} / ${total} 题</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6rem">答对 ${quiz.correct} / ${total} 题</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:30rem">${score>=90?'太棒了，几乎全对！':score>=60?'不错，继续加油！':'多复习一下生词本吧'}</div>
     ${quiz.wrong.length?`<button class="btn amber" onclick="reviewQuizWrong()">复习错词 (${quiz.wrong.length})</button><div style="height:16rem"></div>`:''}
-    <button class="btn" onclick="quizStart()">再测一次</button>
+    <button class="btn gold" onclick="quizStart()">再测一次</button>
     <div style="height:16rem"></div>
     <button class="btn ghost" onclick="quiz.state='menu';refresh()">返回设置</button>
     <div class="safe"></div>
@@ -376,9 +386,14 @@ function reviewQuizWrong(){ wordSession={list:quiz.wrong.slice(),idx:0,revealed:
 ========================================================= */
 function renderSecurity(){
   let html=`<div class="view">
-    <div class="welcome-card" style="background:linear-gradient(135deg,#1e3a5f,#1a5276 50%,#1a7f37);padding:30rem">
-      <div style="font-size:18px;font-weight:700">🛡 空保英语</div>
-      <div style="font-size:12px;opacity:.9;margin-top:8rem">民航客舱安保 · 机场执勤 · 境外过夜场景</div>
+    <div class="welcome-card" style="padding:30rem">
+      <div style="font-size:18px;font-weight:800;">${icon('shield')} 空保英语</div>
+      <div style="font-size:12px;opacity:.85;margin-top:8rem">民航客舱安保 · 机场执勤 · 境外过夜场景</div>
+    </div>
+    <div class="story-list-card" onclick="openStoryList()" style="margin-top:22rem;background:linear-gradient(135deg,#fff6e0,#fff);border:1rem solid #f2e2b0;">
+      <div class="story-list-icon" style="background:linear-gradient(135deg,#f87171,#b91c1c);">${icon('alert')}</div>
+      <div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">还原12种真实特情处置全过程</div></div>
+      <span class="func-arrow">›</span>
     </div>`;
   SECURITY.forEach((part,pi)=>{
     html+=`<div class="part-title">${esc(part.part)} <span class="en">${esc(part.partEn||'')}</span></div>`;
@@ -395,7 +410,7 @@ function openSecCat(pi,ci){
     c.items.forEach(it=>{
       if(it.type==='dialogue'){
         html+=`<div class="part-title">${esc(it.title||'对话')}</div>`;
-        it.turns.forEach(t=>{ const left=t.speaker==='Q'||t.speaker==='A'&&false; const isQ=t.speaker==='Q';
+        it.turns.forEach(t=>{ const isQ=t.speaker==='Q';
           html+=`<div class="bubble ${isQ?'left':'right'}"><div class="role-tag">${esc(t.role||t.speaker)}</div><div>${esc(t.en)}</div>${t.cn?`<div class="cn">${esc(t.cn)}</div>`:''}<div class="b-play" onclick="speak(${jsAttr(t.en)})">🔊</div></div>`; });
       } else if(it.type==='qa'){
         html+=`<div class="qa-item">
@@ -444,7 +459,7 @@ function sendChat(){
   if(r.length) chatLog.push({from:'bot',text:`为你找到 ${r.length} 条相关内容：`,results:r});
   else chatLog.push({from:'bot',text:'没有找到相关内容，换个关键词试试？例如「安检」「hotel」「护照」。'});
   refresh();
-  setTimeout(()=>{ const v=root.querySelector('.chat-wrap'); if(v) window.scrollTo(0,document.body.scrollHeight); },30);
+  setTimeout(()=>{ window.scrollTo(0,document.body.scrollHeight); },30);
 }
 
 /* =========================================================
@@ -453,31 +468,34 @@ function sendChat(){
 function renderMe(){
   const name=LS.get('displayName','');
   const st=calcStreak(); const studied=LS.get('studiedWords',[]).length; const wrong=LS.get('wrongWords',[]).length;
+  const xp = (typeof totalXP==='function') ? totalXP() : 0;
+  const level = (typeof userLevel==='function') ? userLevel() : 1;
   return `<div class="view">
     <div class="card" style="display:flex;align-items:center;gap:20rem">
-      <div class="welcome-avatar" style="background:linear-gradient(135deg,#1e3a5f,#1a7f37);color:#fff">${esc((name[0]||'游'))}</div>
-      <div><div style="font-size:16px;font-weight:700">${esc(name||'游客')}</div><div style="font-size:12px;color:var(--muted)">五班英语角 · 空保英语</div></div>
+      <div class="welcome-avatar" style="background:linear-gradient(135deg,var(--navy-800),var(--navy-950));color:#fff">${esc((name[0]||'游'))}</div>
+      <div><div style="font-size:16px;font-weight:800">${esc(name||'游客')}</div><div style="font-size:12px;color:var(--muted)">五班英语角 · 空保英语 · Lv.${level}</div></div>
     </div>
-    <div class="daily-list" style="margin-top:20rem">
-      <div class="card" style="text-align:center"><div style="font-size:24px;font-weight:800;color:var(--green)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
-      <div class="card" style="text-align:center"><div style="font-size:24px;font-weight:800;color:#f59e0b">${st.streak}</div><div style="font-size:11px;color:var(--muted)">连续打卡</div></div>
+    <div class="daily-list" style="margin-top:20rem;grid-template-columns:repeat(3,1fr);">
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--gold-dark)">${xp}</div><div style="font-size:11px;color:var(--muted)">经验值</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:#f59e0b">${st.streak}</div><div style="font-size:11px;color:var(--muted)">连续打卡</div></div>
     </div>
     <div class="card" style="margin-top:20rem">
       <div class="setting-row"><span style="font-size:13px;width:96rem">显示名称</span><input id="nameIn" value="${esc(name)}" placeholder="设置你的名字"><button class="setting-save" onclick="saveName()">保存</button></div>
     </div>
-    <div class="list-item arrow-item" style="margin-top:20rem" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">★</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" style="margin-top:20rem" onclick="switchTab('words')"><div class="play" style="background:#fff6e0;color:var(--gold-dark)">${icon('book')}</div><div class="li-main"><div class="li-en">闯关地图</div><div class="li-cn">继续学习进度</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openStoryList()"><div class="play" style="background:#fee2e2;color:#b91c1c">${icon('alert')}</div><div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">真实特情处置</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">★</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openQuiz()"><div class="play" style="background:#fdebf4;color:#ec4899">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openChat()"><div class="play" style="background:#efeafe;color:#7c3aed">🤖</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openChat()"><div class="play" style="background:#efeafe;color:#7c3aed">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
     <div class="links">
-      <span onclick="resetCheckin()">重置打卡</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="aboutApp()">关于</span>
+      <span onclick="resetCheckin()">重置打卡</span>·<span onclick="resetProgress()">重置闯关进度</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="aboutApp()">关于</span>
     </div>
     <div class="safe"></div>
   </div>`;
 }
 function saveName(){ const v=document.getElementById('nameIn').value.trim(); LS.set('displayName',v); toast('已保存'); refresh(); }
 function resetCheckin(){ if(confirm('确定重置全部打卡记录？')){ LS.set('checkinHistory',[]); LS.set('lastCheckinDate',''); toast('已重置'); refresh(); } }
+function resetProgress(){ if(confirm('确定重置闯关地图进度与经验值？')){ LS.set('lessonProgress',{}); LS.set('storyProgress',{}); LS.set('xp',0); toast('已重置'); refresh(); } }
 function clearWrong(){ if(confirm('确定清空生词本？')){ LS.set('wrongWords',[]); toast('已清空'); refresh(); } }
-function aboutApp(){ alert('五班英语角 · 空保英语\n\n民航安保执勤英语学习应用\n内容来源于原小程序与保警部空保英语教学资料\n\n离线可用 · 数据存储于本机'); }
-
-/* ---------- boot ---------- */
-switchTab('home');
+function aboutApp(){ alert('五班英语角 · 空保英语\n\n民航安保执勤英语学习应用（闯关升级版）\n背单词参考多邻国式关卡设计，内含500+执勤词汇、情景闯关剧本与空保英语专题\n\n离线可用 · 数据存储于本机'); }
