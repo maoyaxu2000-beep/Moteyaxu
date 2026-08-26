@@ -35,8 +35,25 @@
 <script src="app.js"></script>
 <script src="engine.js"></script>
 <script>
+/* 静态资源是缓存优先，原来更新内容后学员要打开两次才看到新版。
+   这里监听到新版本就地提示，点确定立即刷新。 */
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed' && navigator.serviceWorker.controller){
+            if(confirm('学习内容有更新，是否立即刷新？')){
+              nw.postMessage({type:'SKIP_WAITING'});
+              location.reload();
+            }
+          }
+        });
+      });
+    }).catch(()=>{});
+  });
 }
 </script>
 </body>
