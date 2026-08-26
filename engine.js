@@ -38,9 +38,16 @@ function nodeCompleted(node){
   if(node.type==='lesson'){ const p=lessonProgress()[node.id]; return !!(p && p.stars>0); }
   return !!storyProgress()[node.id];
 }
+/* 解锁规则（改动）：
+   原来是全图一条线性链 —— 想学 u12「涉外驻留」得先打完前面 60 多关，
+   下周就要飞外站的同事会直接放弃。
+   现在改成：单元内部仍需按顺序推进，但每个单元的第 1 关都直接开放。 */
 function nodeUnlocked(index, nodes){
   if(index===0) return true;
-  return nodeCompleted(nodes[index-1]);
+  const prev = nodes[index-1];
+  const cur  = nodes[index];
+  if(prev.unitId !== cur.unitId) return true;   // 每个单元的第一关直接解锁
+  return nodeCompleted(prev);
 }
 function totalXP(){ return LS.get('xp',0); }
 function addXP(n){ LS.set('xp', totalXP()+n); }
@@ -109,29 +116,55 @@ let lessonSession = null;
 function openLesson(lessonId){
   const node = buildMapNodes().find(n=>n.id===lessonId && n.type==='lesson');
   if(!node) return;
-  lessonSession = { node, exercises: buildExercises(node.words), idx:0, hearts:5, correct:0, failed:false };
+  lessonSession = { node, exercises: buildExercises(node.words), idx:0, hearts:5, correct:0, failed:false, missedWords:[] };
   navigate(renderLessonView, node.unit.title, '');
+}
+/* 原地重开：不再往返回栈里压新的一层，避免连续重试后要按很多次返回键 */
+function retryLesson(lessonId){
+  const node = buildMapNodes().find(n=>n.id===lessonId && n.type==='lesson');
+  if(!node) return;
+  lessonSession = { node, exercises: buildExercises(node.words), idx:0, hearts:5, correct:0, failed:false, missedWords:[] };
+  refreshLesson();
 }
 
 function buildExercises(words){
   const pool = words.slice();
-  const ex = [];
   const wc = pool.length;
-  // 1-2 choice (en->cn / cn->en)
-  if(wc>=1) ex.push(makeChoiceExercise(pool[0 % wc], 'en2cn'));
-  if(wc>=2) ex.push(makeChoiceExercise(pool[1 % wc], 'cn2en'));
-  // listening
-  if(wc>=3) ex.push(makeListeningExercise(pool[2 % wc]));
-  // spelling x2
-  if(wc>=1) ex.push(makeSpellingExercise(pool[3 % wc] || pool[0]));
-  if(wc>=2) ex.push(makeSpellingExercise(pool[4 % wc] || pool[1]));
-  // matching
+  if(!wc) return [];
+  const ex = [];
+
+  /* 关键修正：原来固定取 pool[0]~pool[4]，导致每关最后 1-2 个词
+     除了配对题随机撞上，永远不会被单独考到。
+     现在改成遍历每一个词，轮流分配题型，保证 100% 覆盖。 */
+  const TYPES = ['en2cn', 'cn2en', 'listening', 'spelling'];
+  pool.forEach((w, i)=>{
+    const t = TYPES[i % TYPES.length];
+    if(t==='en2cn')          ex.push(makeChoiceExercise(w, 'en2cn'));
+    else if(t==='cn2en')     ex.push(makeChoiceExercise(w, 'cn2en'));
+    else if(t==='listening') ex.push(makeListeningExercise(w));
+    else                     ex.push(makeSpellingExercise(w));
+  });
+
+  // matching（覆盖整关词汇的交叉复习）
   if(wc>=3) ex.push(makeMatchExercise(pool));
-  // ordering (sentence)
-  const orderWord = pool.find(w=>w.example && w.example.split(' ').length>=4) || pool[0];
-  if(orderWord) ex.push(makeOrderExercise(orderWord));
-  // scenario judgment
-  ex.push(makeScenarioExercise());
+
+  /* 排序造句：只挑「无标点、无重复单词」的例句，
+     避免逗号跟着单词跑、以及重复词导致判定串位 */
+  const orderCandidates = pool.filter(w=>{
+    if(!w.example) return false;
+    const body = w.example.replace(/\.$/,'');
+    if(/[,;:!?"'()]/.test(body)) return false;
+    const toks = body.split(' ');
+    if(toks.length < 4 || toks.length > 9) return false;
+    const lower = toks.map(t=>t.toLowerCase());
+    return new Set(lower).size === lower.length;   // 无重复词
+  });
+  if(orderCandidates.length){
+    ex.push(makeOrderExercise(orderCandidates[Math.floor(Math.random()*orderCandidates.length)]));
+  }
+
+  // 情景判断（优先出与本关主题相关的场景）
+  ex.push(makeScenarioExercise(words));
   return shuffle(ex);
 }
 function randomDistractors(exclude, n, field){
@@ -163,9 +196,27 @@ function makeOrderExercise(word){
   const tokens = clean.split(' ');
   return { type:'order', word, tokens, shuffled: shuffle(tokens), placed:[] };
 }
-function makeScenarioExercise(){
+/* 关卡词汇分类 → 口语场景分类 的映射，
+   让情景判断题跟当前学的内容相关，而不是在学危险品时冷不丁考酒店退房 */
+const SCENE_HINTS = {
+  '登机检查': ['证件','证件类型扩展','流程','登机口特殊处置','行李','安检'],
+  '客舱巡查': ['客舱','客舱设施扩展','安全设备','指令','客舱服务礼仪','驾驶舱门安全'],
+  '行李检查': ['行李','危险品细化','货运与危险品运输','设备','安检'],
+  '旅客劝导': ['旅客处置','沟通','情绪与沟通技巧','醉酒精神异常','处置','投诉服务补救'],
+  '落地处置': ['机场公安交接','执法','涉外文书笔录','涉外人身检查'],
+  '紧急应对': ['应急','医疗急救','反劫机处置','爆炸物威胁','涉毒特情','涉恐特情','常见突发情境','身体部位伤情'],
+  '日常交际': ['日常交际','沟通','结束用语'],
+  '海外生活': ['酒店住宿','餐饮美食','交通出行','购物消费','紧急求助','出入境海关扩展','通讯网络出境','银行金融出境']
+};
+function makeScenarioExercise(lessonWords){
   const cats = SPEAKING;
-  const cat = cats[Math.floor(Math.random()*cats.length)];
+  let cat = null;
+  if(lessonWords && lessonWords.length){
+    const lessonCats = new Set(lessonWords.map(w=>w.category));
+    const matches = cats.filter(c=>(SCENE_HINTS[c.category]||[]).some(x=>lessonCats.has(x)));
+    if(matches.length) cat = matches[Math.floor(Math.random()*matches.length)];
+  }
+  if(!cat) cat = cats[Math.floor(Math.random()*cats.length)];
   const correct = cat.list[Math.floor(Math.random()*cat.list.length)];
   const others = [];
   while(others.length<3){
@@ -259,8 +310,11 @@ function answerSpelling(){
   const ex = lessonSession.exercises[lessonSession.idx];
   if(ex.answered) return; ex.answered=true;
   const input = document.getElementById('spellIn');
-  const val = (input.value||'').trim().toLowerCase();
-  const ok = val === ex.word.word.toLowerCase();
+  /* 容错：多余空格、缺空格、连字符差异都算对，
+     免得 "securityofficer" / "X ray" 这类明明会了却判错 */
+  const norm = t => (t||'').toLowerCase().replace(/[\s\-]+/g,'');
+  const val = (input.value||'').trim();
+  const ok = norm(val) === norm(ex.word.word);
   input.classList.add(ok?'correct':'wrong');
   input.disabled = true;
   document.getElementById('spellFeedback').innerHTML = ok
@@ -304,6 +358,9 @@ function tapMatch(side, i){
     } else {
       toast('配对错误');
       loseHeart();
+      /* 配对错的这个词也要进生词本 */
+      const missed = ex.pairs[l.pid];
+      if(missed) collectMissedWord(missed);
       setTimeout(()=>{ ex.selLeft=null; ex.selRight=null; refreshLesson(); },500);
     }
   }
@@ -369,10 +426,29 @@ function answerScenario(i){
 }
 
 /* ---- shared result handling ---- */
+/* 把答错的词自动收进生词本（闯关模式原本完全不记录，学习闭环在这里断掉了） */
+function collectMissedWord(word){
+  if(!word || !word.word) return;
+  const s = lessonSession;
+  if(s){
+    s.missedWords = s.missedWords || [];
+    if(!s.missedWords.includes(word.word)) s.missedWords.push(word.word);
+  }
+  const arr = LS.get('wrongWords', []);
+  if(!arr.find(x=>x.word===word.word)){
+    arr.push(word);
+    LS.set('wrongWords', arr);
+  }
+}
+
 function handleResult(ok, after, skipAutoAdvance){
   const s = lessonSession;
   if(ok){ s.correct++; toast('回答正确 ✓'); }
-  else { loseHeart(); }
+  else {
+    loseHeart();
+    const ex = s.exercises[s.idx];
+    if(ex && ex.word) collectMissedWord(ex.word);
+  }
   refreshLesson();
   setTimeout(()=>{ if(s.hearts>0 || ok){ if(after) after(); } else { refreshLesson(); } }, ok?600:1100);
 }
@@ -389,10 +465,26 @@ function finishLesson(){
   const s = lessonSession;
   s.done = true;
   const stars = s.hearts>=5 ? 3 : s.hearts>=3 ? 2 : 1;
-  const xp = s.correct*10 + stars*20;
+  const fullXp = s.correct*10 + stars*20;
   const prev = lessonProgress()[s.node.id];
-  if(!prev || prev.stars < stars){ saveLessonProgress(s.node.id, {stars, xp}); }
-  addXP(xp);
+
+  /* XP 规则（防止重复刷分）：
+     · 首次通关：全额 XP
+     · 重打且刷新了星级纪录：补发差额
+     · 重打且没刷新纪录：只给 5 XP 复习奖励 */
+  let gained;
+  if(!prev){
+    gained = fullXp;
+    saveLessonProgress(s.node.id, {stars, xp:fullXp});
+  } else if(prev.stars < stars){
+    gained = Math.max(0, fullXp - (prev.xp||0));
+    saveLessonProgress(s.node.id, {stars, xp:fullXp});
+  } else {
+    gained = 5;
+  }
+  s.gainedXp = gained;
+  addXP(gained);
+
   const set = new Set(LS.get('studiedWords',[]));
   s.node.words.forEach(w=>set.add(w.word));
   LS.set('studiedWords',[...set]);
@@ -401,7 +493,8 @@ function finishLesson(){
 function renderLessonResult(){
   const s = lessonSession;
   const stars = s.hearts>=5 ? 3 : s.hearts>=3 ? 2 : 1;
-  const xp = s.correct*10 + stars*20;
+  const xp = (s.gainedXp!=null) ? s.gainedXp : (s.correct*10 + stars*20);
+  const missed = (s.missedWords||[]).length;
   return `<div class="view" style="text-align:center">
     <div style="font-size:60rem;margin:20rem 0;animation:pop .5s ease;">🎉</div>
     <div style="font-size:19px;font-weight:800;">关卡完成！</div>
@@ -411,9 +504,13 @@ function renderLessonResult(){
       <div class="result-stat"><b>+${xp}</b><span>获得经验</span></div>
       <div class="result-stat"><b>${s.hearts}</b><span>剩余生命</span></div>
     </div>
+    ${missed ? `<div class="card" style="margin-top:18rem;text-align:left">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6rem">📌 本关有 ${missed} 个词已自动加入生词本</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6">${(s.missedWords||[]).map(w=>esc(w)).join('、')}</div>
+    </div>` : ''}
     <button class="btn gold" onclick="finishLessonExit()">继续闯关</button>
     <div style="height:16rem"></div>
-    <button class="btn ghost" onclick="openLesson('${s.node.id}')">再来一次</button>
+    <button class="btn ghost" onclick="retryLesson('${s.node.id}')">再来一次</button>
     <div class="safe"></div>
   </div>`;
 }
@@ -423,7 +520,7 @@ function renderLessonFail(){
     <div style="font-size:60rem;margin:20rem 0;">💔</div>
     <div style="font-size:19px;font-weight:800;">生命值耗尽</div>
     <div style="font-size:13px;color:var(--muted);margin:10rem 0 30rem;">别灰心，再试一次就能掌握这些执勤用语</div>
-    <button class="btn gold" onclick="openLesson('${lessonSession.node.id}')">重新挑战</button>
+    <button class="btn gold" onclick="retryLesson('${lessonSession.node.id}')">重新挑战</button>
     <div style="height:16rem"></div>
     <button class="btn ghost" onclick="lessonSession=null;goBack();switchTab('words')">返回地图</button>
     <div class="safe"></div>
