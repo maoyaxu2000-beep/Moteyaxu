@@ -177,6 +177,16 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .flash{background:var(--card);border-radius:30rem;box-shadow:var(--shadow-md);padding:48rem 36rem;text-align:center;margin-top:10rem;min-height:430rem;
   display:flex;flex-direction:column;justify-content:center;}
 .flash-cat{display:inline-block;align-self:center;background:#eef2f8;color:var(--navy-800);font-size:11px;padding:6rem 18rem;border-radius:30rem;margin-bottom:24rem;}
+
+/* ---- 使用场景标签：空保英语的核心区分维度 ---- */
+.usage-tag{display:inline-flex;align-items:center;gap:5rem;font-size:10px;font-weight:700;
+  padding:4rem 12rem;border-radius:30rem;letter-spacing:.2px;white-space:nowrap;}
+.usage-tag.radio{background:#e0edff;color:#1d4ed8;}
+.usage-tag.face {background:#e6f6ec;color:#15803d;}
+.usage-tag.write{background:#f3e9fb;color:#7e22ce;}
+.usage-tag.life {background:#fff2dd;color:#b45309;}
+.flash-tags{display:flex;justify-content:center;gap:8rem;margin-bottom:24rem;flex-wrap:wrap;align-items:center;}
+.usage-legend{display:flex;flex-wrap:wrap;gap:8rem;margin:14rem 0 4rem;}
 .flash-word{font-size:30px;font-weight:800;letter-spacing:.5rem;}
 .flash-ph{font-size:14px;color:var(--muted);margin-top:12rem;}
 .flash-play{margin:24rem auto 0;width:96rem;height:96rem;border-radius:50%;background:linear-gradient(135deg,var(--navy-800),var(--navy-950));
