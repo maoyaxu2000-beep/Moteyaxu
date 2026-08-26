@@ -17,11 +17,20 @@ function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.fl
 
 /* ---------- TTS ---------- */
 let enVoice=null;
+/* 词库里的音标是英式（/ɒ/ /ɑː/），原来却固定选美音朗读，
+   学员看到的和听到的对不上。这里改成可切换，默认英音以匹配音标。 */
+function voiceAccent(){ return LS.get('voiceAccent','GB'); }
+function accentLang(){ return voiceAccent()==='US' ? 'en-US' : 'en-GB'; }
 function pickVoice(){
   const vs=speechSynthesis.getVoices();
-  enVoice = vs.find(v=>/en[-_]US/i.test(v.lang)&&/female|samantha|zira|google/i.test(v.name))
-         || vs.find(v=>/en[-_]US/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || null;
+  const want = voiceAccent()==='US' ? /en[-_]US/i : /en[-_]GB/i;
+  const other= voiceAccent()==='US' ? /en[-_]GB/i : /en[-_]US/i;
+  enVoice = vs.find(v=>want.test(v.lang)&&/female|samantha|zira|google|kate|serena|daniel/i.test(v.name))
+         || vs.find(v=>want.test(v.lang))
+         || vs.find(v=>other.test(v.lang))
+         || vs.find(v=>/^en/i.test(v.lang)) || null;
 }
+function setVoiceAccent(a){ LS.set('voiceAccent',a); pickVoice(); toast(a==='US'?'已切换为美音':'已切换为英音'); speak('Security check, please cooperate.'); refresh(); }
 if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
 function speechRate(){ return LS.get('speechRate',.85); }
 function speak(text,lang){
@@ -29,12 +38,30 @@ function speak(text,lang){
   try{
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
-    u.lang=lang||'en-US'; u.rate=speechRate(); u.pitch=1;
-    if(!lang||lang==='en-US'){ if(enVoice) u.voice=enVoice; }
+    u.lang=lang||accentLang(); u.rate=speechRate(); u.pitch=1;
+    if(!lang||/^en/i.test(lang)){ if(enVoice) u.voice=enVoice; }
     speechSynthesis.speak(u);
   }catch(e){ toast('朗读失败'); }
 }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ---------- 使用场景标签 ----------
+   空保英语的核心难点：同一个意思，对驾驶舱说 / 对旅客说 / 写进报告，说法完全不同。
+   词库里每个词都标了 usage，这里把它显示出来并支持筛选。 */
+const USAGE_META = {
+  radio:{ label:'无线电', icon:'📻', desc:'对驾驶舱/机组通话，简短、格式化' },
+  face: { label:'当面',   icon:'👤', desc:'当面对旅客说，清晰、有礼但有力' },
+  write:{ label:'书面',   icon:'📄', desc:'笔录、报告、移交文书用语' },
+  life: { label:'生活',   icon:'🏨', desc:'外站驻留、日常交际' }
+};
+function usageTag(u){
+  const m = USAGE_META[u];
+  if(!m) return '';
+  return `<span class="usage-tag ${u}">${m.icon} ${m.label}</span>`;
+}
+function usageLegend(){
+  return `<div class="usage-legend">${Object.keys(USAGE_META).map(k=>usageTag(k)).join('')}</div>`;
+}
 function jsAttr(s){ return "'"+String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+"'"; }
 
 /* ---------- toast ---------- */
@@ -210,6 +237,19 @@ function renderWordsMenu(){
       <div class="card" style="text-align:center" onclick="openReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">生词本 ›</div></div>
     </div>
     <button class="btn gold" style="margin-top:20rem;" onclick="openQuiz()">📝 开始单词测试</button>
+
+    <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">按使用场景练</span></div><span class="section-sub">同义不同说法</span></div>
+    <div class="card" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14rem">
+      同一件事，报告驾驶舱、当面对旅客说、写进笔录，说法完全不同。按场景专项练，比按主题背更贴近执勤。
+    </div>
+    ${Object.keys(USAGE_META).map(k=>{
+      const cnt=WORDS.filter(w=>w.usage===k).length;
+      const m=USAGE_META[k];
+      return `<div class="list-item arrow-item" onclick="startWordsByUsage('${k}')">
+        <div class="li-main"><div class="li-en">${m.icon} ${m.label}用语 · ${cnt} 词</div><div class="li-cn">${m.desc}</div></div>
+        <span class="func-arrow">›</span></div>`;
+    }).join('')}
+
     <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">按分类闪卡复习</span></div><span class="section-sub">共 ${WORDS.length} 词</span></div>
     ${chips}
     <div class="safe"></div>
@@ -220,9 +260,16 @@ function startWords(cat){
   wordSession={list,idx:0,revealed:false,mode:'study',cat};
   navigate(renderFlash, cat==='全部'?'闪卡复习':cat, '');
 }
+function startWordsByUsage(u){
+  const m=USAGE_META[u]; if(!m) return;
+  const list=shuffle(WORDS.filter(w=>w.usage===u));
+  if(!list.length){ toast('该场景暂无词条'); return; }
+  wordSession={list,idx:0,revealed:false,mode:'study',cat:m.label+'用语'};
+  navigate(renderFlash, m.icon+' '+m.label+'用语', '');
+}
 function openReview(){
   const list=LS.get('wrongWords',[]);
-  if(!list.length){ toast('生词本是空的'); }
+  if(!list.length){ toast('生词本是空的，先去闯关吧'); return; }
   wordSession={list:list.slice(),idx:0,revealed:false,mode:'review',cat:'生词本'};
   navigate(renderFlash,'生词本 ('+list.length+')','');
 }
@@ -234,7 +281,10 @@ function renderFlash(){
     <div class="progress-txt"><span>${s.idx+1} / ${s.list.length}</span><span>${esc(s.cat)}</span></div>
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
     <div class="flash" onclick="revealWord()">
-      <span class="flash-cat">${esc(w.category||'词汇')}</span>
+      <div class="flash-tags">
+        <span class="flash-cat" style="margin-bottom:0">${esc(w.category||'词汇')}</span>
+        ${usageTag(w.usage)}
+      </div>
       <div class="flash-word speakable" onclick="event.stopPropagation();speak(${jsAttr(w.word)})">${esc(w.word)}</div>
       <div class="flash-ph">${esc(w.phonetic||'')}</div>
       <div class="flash-play" onclick="event.stopPropagation();speak(${jsAttr(w.word)})">🔊</div>
@@ -493,6 +543,14 @@ function renderMe(){
     </div>
     <div class="card" style="margin-top:20rem">
       <div class="setting-row"><span style="font-size:13px;width:96rem">显示名称</span><input id="nameIn" value="${esc(name)}" placeholder="设置你的名字"><button class="setting-save" onclick="saveName()">保存</button></div>
+      <div class="setting-row" style="margin-top:12rem">
+        <span style="font-size:13px;width:96rem">朗读口音</span>
+        <div style="display:flex;gap:8rem;flex:1">
+          <button class="chip ${voiceAccent()==='GB'?'active':''}" onclick="setVoiceAccent('GB')">英音 🇬🇧</button>
+          <button class="chip ${voiceAccent()==='US'?'active':''}" onclick="setVoiceAccent('US')">美音 🇺🇸</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8rem;line-height:1.6">词库音标按英式标注，选英音可与音标对应；执勤实际通话更接近美音，可按需切换。</div>
     </div>
     <div class="list-item arrow-item" style="margin-top:20rem" onclick="switchTab('words')"><div class="play" style="background:#fff6e0;color:var(--gold-dark)">${icon('book')}</div><div class="li-main"><div class="li-en">闯关地图</div><div class="li-cn">继续学习进度</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openStoryList()"><div class="play" style="background:#fee2e2;color:#b91c1c">${icon('alert')}</div><div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">真实特情处置</div></div><span class="func-arrow">›</span></div>
