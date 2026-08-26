@@ -1,5 +1,5 @@
 /* 离线缓存 service worker —— 让整站可在无网络环境下完整使用 */
-const CACHE = 'wuban-english-v5';
+const CACHE = 'wuban-english-v6';
 const ASSETS = ['./','./index.html','./style.css','./icons.js','./app.js','./engine.js',
   './data.core.js','./data.units.js','./data.content.js','./data.scenarios.js',
   './icon.svg','./manifest.webmanifest'];
