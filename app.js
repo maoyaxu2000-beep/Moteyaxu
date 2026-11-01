@@ -668,6 +668,14 @@ function sendChat(){
 /* =========================================================
    ME (我的)
 ========================================================= */
+/* 个人码显示剩余有效期；全员码显示长期有效 */
+function accessNote(){
+  const a=window.ACCESS||{};
+  if(!a.ttl) return '内部学习平台 · 退出后学习记录不会丢失';
+  const left=Math.max(0,Math.ceil((a.expiresAt-Date.now())/86400000));
+  const d=new Date(a.expiresAt);
+  return `个人邀请码 · 剩余 ${left} 天（${d.getMonth()+1}月${d.getDate()}日到期）`;
+}
 function renderMe(){
   const name=LS.get('displayName','');
   const st=calcStreak(); const studied=LS.get('studiedWords',[]).length; const wrong=LS.get('wrongWords',[]).length;
@@ -707,7 +715,7 @@ function renderMe(){
     <div class="list-item arrow-item" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">★</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openQuiz()"><div class="play" style="background:#fdebf4;color:#ec4899">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openChat()"><div class="play" style="background:#efeafe;color:#7c3aed">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="accessLogout()"><div class="play" style="background:#f1f5f9;color:var(--navy-800)">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">内部学习平台 · 退出后学习记录不会丢失</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="accessLogout()"><div class="play" style="background:#f1f5f9;color:var(--navy-800)">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">${accessNote()}</div></div><span class="func-arrow">›</span></div>
     <div class="links">
       <span onclick="resetCheckin()">重置打卡</span>·<span onclick="resetProgress()">重置闯关进度</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="aboutApp()">关于</span>
     </div>

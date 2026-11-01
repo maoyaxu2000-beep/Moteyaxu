@@ -15,6 +15,14 @@
   const normCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const hex8 = async raw => [...new Uint8Array(await crypto.subtle.digest('SHA-256', raw))].slice(0, 4).map(b => b.toString(16).padStart(2, '0')).join('');
 
+  /* 个人码有效期：从这台设备首次进入开始计时，记录单独保存（退出登录不会重置） */
+  const ACT = 'wbActivated', DAY = 86400000;
+  function actTime(code){ try{ return (JSON.parse(localStorage.getItem(ACT) || '{}'))[normCode(code)] || 0; }catch(e){ return 0; } }
+  function markAct(code){ try{ const m = JSON.parse(localStorage.getItem(ACT) || '{}'); const k = normCode(code); if(!m[k]){ m[k] = Date.now(); localStorage.setItem(ACT, JSON.stringify(m)); } }catch(e){} }
+  function expiresAt(code, ttl){ return ttl ? actTime(code) + ttl * DAY : 0; }
+  function isExpired(code, ttl){ const e = expiresAt(code, ttl); return !!(ttl && actTime(code) && Date.now() > e); }
+  const EXPIRED_MSG = ttl => `此邀请码已过期（激活后 ${ttl} 天有效），请联系管理员获取新的邀请码`;
+
   function readStore(){ try{ return JSON.parse(localStorage.getItem(STORE) || 'null'); }catch(e){ return null; } }
   function writeStore(v){ try{ localStorage.setItem(STORE, JSON.stringify(v)); }catch(e){} }
 
@@ -33,7 +41,7 @@
     try{
       const raw = await aesDecrypt(kek, b64d(entry.wk));
       if(await hex8(raw) !== keys.kid) return null;
-      return new Uint8Array(raw);
+      return { raw:new Uint8Array(raw), ttl:entry.ttl || 0 };
     }catch(e){ return null; }
   }
 
@@ -50,24 +58,31 @@
     const saved = readStore();
     const keys = await fetchKeys();
     if(!saved){ showGate('', keys); return; }
-    if(!keys){ return start(b64d(saved.k), saved.kid); }            // 离线：用本机已保存的密钥
     const id = normCode(saved.code).slice(0, 4);
-    if(!(keys.entries || []).some(e => e.id === id)){
+    const entry = keys && (keys.entries || []).find(e => e.id === id);
+    const ttl = keys ? ((entry && entry.ttl) || 0) : (saved.ttl || 0);   // 离线时用上次记下的有效期
+    if(isExpired(saved.code, ttl)){
+      localStorage.removeItem(STORE);
+      showGate(EXPIRED_MSG(ttl), keys); return;
+    }
+    if(!keys){ return start(b64d(saved.k), saved.kid, saved.code, ttl); }   // 离线：用本机已保存的密钥
+    if(!entry){
       localStorage.removeItem(STORE);
       showGate('你的邀请码已停用，请向管理员索取新的邀请码', keys); return;
     }
-    if(keys.kid === saved.kid) return start(b64d(saved.k), saved.kid);
-    const raw = await unwrap(keys, saved.code);                      // 主密钥已更换：用保存的码重新解
-    if(!raw){ localStorage.removeItem(STORE); showGate('邀请码需要重新验证，请重新输入', keys); return; }
-    writeStore({ code:saved.code, kid:keys.kid, k:b64e(raw) });
-    start(raw, keys.kid);
+    if(keys.kid === saved.kid){ if(saved.ttl !== ttl) writeStore(Object.assign(saved, { ttl })); return start(b64d(saved.k), saved.kid, saved.code, ttl); }
+    const got = await unwrap(keys, saved.code);                      // 主密钥已更换：用保存的码重新解
+    if(!got){ localStorage.removeItem(STORE); showGate('邀请码需要重新验证，请重新输入', keys); return; }
+    writeStore({ code:saved.code, kid:keys.kid, k:b64e(got.raw), ttl:got.ttl });
+    start(got.raw, keys.kid, saved.code, got.ttl);
   }
 
-  async function start(raw, kid){
+  async function start(raw, kid, code, ttl){
     showLoading();
     try{
       const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
-      window.ACCESS = { key, kid, decrypt:(buf) => aesDecrypt(key, buf) };
+      window.ACCESS = { key, kid, decrypt:(buf) => aesDecrypt(key, buf),
+                        ttl:ttl || 0, expiresAt:expiresAt(code, ttl), codeId:normCode(code).slice(0, 4) };
       const r = await fetch('data.enc?k=' + kid);
       if(!r.ok) throw new Error('data');
       const text = td.decode(await aesDecrypt(key, await r.arrayBuffer()));
@@ -122,10 +137,12 @@
     const keys = gateKeys || await fetchKeys();
     if(!keys){ btn.disabled = false; btn.textContent = '进入'; msg.textContent = '首次验证需要联网'; return; }
     gateKeys = keys;
-    const raw = await unwrap(keys, code);
-    if(!raw){ btn.disabled = false; btn.textContent = '进入'; msg.textContent = '邀请码不正确或已停用'; return; }
-    writeStore({ code:normCode(code), kid:keys.kid, k:b64e(raw) });
-    start(raw, keys.kid);
+    const got = await unwrap(keys, code);
+    if(!got){ btn.disabled = false; btn.textContent = '进入'; msg.textContent = '邀请码不正确或已停用'; return; }
+    if(isExpired(code, got.ttl)){ btn.disabled = false; btn.textContent = '进入'; msg.textContent = EXPIRED_MSG(got.ttl); return; }
+    if(got.ttl) markAct(code);                                        // 首次进入：开始计时
+    writeStore({ code:normCode(code), kid:keys.kid, k:b64e(got.raw), ttl:got.ttl });
+    start(got.raw, keys.kid, code, got.ttl);
   }
   function showLoading(){
     gateEl().innerHTML = `<div class="gate-card"><img class="gate-logo" src="icon.svg" alt=""><div class="gate-sub" style="margin-top:20px">正在加载学习内容…</div></div>`;
@@ -144,6 +161,11 @@
     localStorage.removeItem(STORE);
     location.reload();
   };
+
+  document.addEventListener('visibilitychange', () => {
+    const a = window.ACCESS;
+    if(document.visibilityState === 'visible' && a && a.ttl && a.expiresAt && Date.now() > a.expiresAt) location.reload();
+  });
 
   boot();
 })();
