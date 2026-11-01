@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0f2544">
+<meta name="robots" content="noindex, nofollow">
+<title>五班英语角 · 空保执勤英语</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar" id="topbar">
+    <button class="back" onclick="goBack()">‹</button>
+    <div class="title" id="topTitle">五班英语角</div>
+    <div class="act" id="topAct"></div>
+  </div>
+  <div id="root"></div>
+</div>
+
+<div class="tabbar" id="tabbar"></div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 学习内容与语音都是加密的：lock.js 验证邀请码、解密后再加载 app.js / engine.js / drills.js -->
+<script src="audio/gb.js"></script>
+<script src="audio/us.js"></script>
+<script src="audio/gb2.js"></script>
+<script src="audio/us2.js"></script>
+<script src="icons.js"></script>
+<script src="lock.js"></script>
+<script>
+/* 静态资源是缓存优先，原来更新内容后学员要打开两次才看到新版。
+   这里监听到新版本就地提示，点确定立即刷新。 */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed' && navigator.serviceWorker.controller){
+            if(confirm('学习内容有更新，是否立即刷新？')){
+              nw.postMessage({type:'SKIP_WAITING'});
+              location.reload();
+            }
+          }
+        });
+      });
+    }).catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
