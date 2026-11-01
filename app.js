@@ -32,7 +32,17 @@ function pickVoice(){
 }
 function setVoiceAccent(a){ LS.set('voiceAccent',a); pickVoice(); toast(a==='US'?'已切换为美音':'已切换为英音'); speak('Security check, please cooperate.'); refresh(); }
 if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
-function speechRate(){ return LS.get('speechRate',.85); }
+/* 朗读语速：数值就是实际播放倍速，正常 = 1.0x。
+   旧版存的是系统朗读语速（默认 0.85 才是正常），这里一次性换算成新的倍速，学员听到的速度不变 */
+function speechRate(){
+  const v=LS.get('playRate',null);
+  if(v!=null) return v;
+  const old=LS.get('speechRate',null);
+  const nv = old==null ? 1 : Math.min(1.5, Math.max(0.5, Math.round(old/0.85*20)/20));
+  LS.set('playRate',nv);
+  return nv;
+}
+function rateLabel(v){ v=Math.round(v*100)/100; return (v%1===0 ? v.toFixed(1) : String(v))+'x'; }
 
 /* ---------- 真人质感语音 ----------
    系统自带 TTS 机械、生硬。平台里的英文句子已用神经网络语音模型预先生成 mp3
@@ -55,9 +65,7 @@ function hasAudio(set,key){
   }
   return audioSets[set].has(key);
 }
-/* 默认 0.85x 是给系统 TTS 用的（系统语速偏快）；真人音频本身就是自然语速，
-   所以按比例换算：默认档 = 原速，往左越慢，往右略快 */
-function audioRate(){ return Math.min(1.5, Math.max(0.5, speechRate()/0.85)); }
+function audioRate(){ return Math.min(1.5, Math.max(0.5, speechRate())); }
 const player = new Audio();
 player.preload='auto';
 /* 语音文件是加密的：下载密文 → 用本机密钥解密 → 生成临时播放地址（最近 150 条留在内存里） */
@@ -162,7 +170,7 @@ function ttsSpeak(text,lang,done){
   try{
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(text);
-    u.lang=lang||accentLang(); u.rate=speechRate(); u.pitch=1;
+    u.lang=lang||accentLang(); u.rate=speechRate()*0.85; u.pitch=1;   // 系统朗读本身偏快，乘 0.85 才接近自然语速
     if(!lang||/^en/i.test(lang)){ if(enVoice) u.voice=enVoice; }
     u.onend=()=>{ if(done) done(); };
     speechSynthesis.speak(u);
@@ -785,9 +793,9 @@ window.addEventListener('offline', ()=>{ toast('已离线 · 可继续学习，�
    全局朗读语速控制（悬浮按钮，任意页面可调）
 ========================================================= */
 function setSpeechRate(v){
-  LS.set('speechRate', Math.round(Number(v)*100)/100);
-  const lab=document.getElementById('speedFabLabel'); if(lab) lab.textContent=speechRate().toFixed(2)+'x';
-  const val=document.getElementById('speedVal'); if(val) val.textContent=speechRate().toFixed(2)+'x';
+  LS.set('playRate', Math.round(Number(v)*100)/100);
+  const lab=document.getElementById('speedFabLabel'); if(lab) lab.textContent=rateLabel(speechRate());
+  const val=document.getElementById('speedVal'); if(val) val.textContent=rateLabel(speechRate());
 }
 function toggleSpeedPanel(){ const p=document.getElementById('speedPanel'); if(p) p.classList.toggle('open'); }
 function speedTest(){ speak('Please show your boarding pass and ID.'); }
@@ -798,12 +806,12 @@ function initSpeedControl(){
   wrap.className='speed-widget-wrap';
   wrap.innerHTML=`
     <div class="speed-panel" id="speedPanel">
-      <div class="speed-panel-head"><span>朗读语速</span><span id="speedVal">${rate.toFixed(2)}x</span></div>
-      <input type="range" id="speedSlider" min="0.5" max="1.15" step="0.05" value="${rate}" oninput="setSpeechRate(this.value)">
-      <div class="speed-panel-labels"><span>慢速</span><span>正常语速</span></div>
+      <div class="speed-panel-head"><span>朗读语速</span><span id="speedVal">${rateLabel(rate)}</span></div>
+      <input type="range" id="speedSlider" min="0.5" max="1.5" step="0.05" value="${rate}" oninput="setSpeechRate(this.value)">
+      <div class="speed-panel-labels"><span>慢速</span><span>正常 1.0x</span><span>快速</span></div>
       <button class="btn ghost" style="margin-top:14rem;padding:16rem;font-size:13px;" onclick="speedTest()"><span class="pbtn-in" style="pointer-events:none">${PI}</span> 试听效果</button>
     </div>
-    <div class="speed-fab" id="speedFab" onclick="toggleSpeedPanel()">${icon('speaker')}<span id="speedFabLabel">${rate.toFixed(2)}x</span></div>
+    <div class="speed-fab" id="speedFab" onclick="toggleSpeedPanel()">${icon('speaker')}<span id="speedFabLabel">${rateLabel(rate)}</span></div>
   `;
   document.body.appendChild(wrap);
 }
