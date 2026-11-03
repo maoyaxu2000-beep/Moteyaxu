@@ -1,0 +1,6 @@
+{
+  "name": "wuban-english-tests",
+  "private": true,
+  "scripts": { "test": "node smoke.js && node gate.js", "postinstall": "playwright install chromium" },
+  "devDependencies": { "playwright": "^1.45.0" }
+}

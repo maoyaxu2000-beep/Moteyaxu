@@ -4,14 +4,15 @@ const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css', '.svg':'image/svg+xml', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png' };
 
-function serve(port){
+function serve(port, root){
+  root = root || ROOT;
   return new Promise(ok => {
     const srv = http.createServer((req, res) => {
       let p = decodeURIComponent(req.url.split('?')[0]); if(p.endsWith('/')) p += 'index.html';
       if(p === '/favicon.ico'){ res.writeHead(204); return res.end(); }
       if(p === '/tests/icon.svg') p = '/icon.svg';          // 测试页在 tests/ 下，图标用相对路径时指回根目录
-      const f = path.join(ROOT, p);
-      if(!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()){ res.writeHead(404); return res.end('nf'); }
+      const f = path.join(root, p);
+      if(!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()){ res.writeHead(404); return res.end('nf'); }
       res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store' });
       fs.createReadStream(f).pipe(res);
     }).listen(port, '127.0.0.1', () => ok(srv));
