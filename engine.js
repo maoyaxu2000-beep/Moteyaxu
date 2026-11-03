@@ -124,7 +124,7 @@ function retryLesson(lessonId){
   const node = buildMapNodes().find(n=>n.id===lessonId && n.type==='lesson');
   if(!node) return;
   lessonSession = { node, exercises: buildExercises(node.words), idx:0, hearts:5, correct:0, failed:false, missedWords:[] };
-  refreshLesson();
+  refreshLesson(true);
 }
 
 function buildExercises(words){
@@ -249,7 +249,7 @@ function renderLessonView(){
     <div class="safe"></div>
   </div>`;
 }
-function refreshLesson(){ refresh(); }
+function refreshLesson(fresh){ refresh(!fresh); }   /* refreshLesson(true) = 换题/结算：回顶部并播入场动画 */
 
 /* ---- choice ---- */
 function renderChoiceExercise(ex){
@@ -453,7 +453,7 @@ function handleResult(ok, after, skipAutoAdvance){
      原来这里立即 refreshLesson()，会把刚加上的红/绿高亮和「正确答案」提示全部冲掉，
      用户答错时根本看不到正确答案是什么。 */
   updateLessonHearts();
-  const proceed = ()=>{ if(s.hearts>0 || ok){ if(after) after(); } else { refreshLesson(); } };
+  const proceed = ()=>{ if(s.hearts>0 || ok){ if(after) after(); } else { refreshLesson(true); } };
   /* 拼写、排序答错：显示正确答案后停住，等用户点「继续」再往下走 */
   if(!ok && skipAutoAdvance && s.hearts>0){
     const box = document.getElementById('spellFeedback') || document.getElementById('orderFeedback');
@@ -479,8 +479,8 @@ function loseHeart(){
 }
 function nextExercise(){
   const s = lessonSession;
-  if(s.hearts<=0){ refreshLesson(); return; }
-  if(s.idx < s.exercises.length-1){ s.idx++; refreshLesson(); }
+  if(s.hearts<=0){ refreshLesson(true); return; }
+  if(s.idx < s.exercises.length-1){ s.idx++; refreshLesson(true); }
   else { finishLesson(); }
 }
 function finishLesson(){
@@ -510,7 +510,7 @@ function finishLesson(){
   const set = new Set(LS.get('studiedWords',[]));
   s.node.words.forEach(w=>set.add(w.word));
   LS.set('studiedWords',[...set]);
-  refreshLesson();
+  refreshLesson(true);
 }
 function renderLessonResult(){
   const s = lessonSession;
@@ -611,7 +611,7 @@ function renderStoryIntro(sc){
     <div class="safe"></div>
   </div>`;
 }
-function beginStory(){ storySession.intro=false; storySession.nodeId=storySession.scenario.start; storySession.picked=null; refresh(); }
+function beginStory(){ storySession.intro=false; storySession.nodeId=storySession.scenario.start; storySession.picked=null; refresh(false); }
 function pickStoryChoice(i){
   const s = storySession;
   const node = s.scenario.nodes[s.nodeId];
@@ -628,7 +628,7 @@ function advanceStory(){
   s.picked = null;
   if(c.next==='end'){ s.ended = true; saveStoryProgress(s.scenario.id); addXP(80); }
   else { s.nodeId = c.next; }
-  refresh();
+  refresh(false);
 }
 function renderStoryEnd(sc){
   return `<div class="view" style="text-align:center">

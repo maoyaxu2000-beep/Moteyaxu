@@ -219,17 +219,22 @@ function navigate(render, title, act){
   stack.push({render, title, sub:true, act}); paint();
 }
 function goBack(){ if(dlgRun){ dlgRun=null; stopSpeak(); } if(stack.length>1){ stack.pop(); paint(); } }
-function refresh(){ paint(); }
-function paint(){
+function refresh(keep){ paint(keep!==false); }   /* 默认原地更新；refresh(false) = 换页式刷新（回顶部 + 入场动画） */
+function paint(keep){
   const cur=stack[stack.length-1];
+  const y = keep ? window.scrollY : 0;
   root.innerHTML = cur.render? cur.render() : cur.html;
+  if(keep && root.firstElementChild) root.firstElementChild.style.animation='none';
   const tb=document.getElementById('topbar');
   tb.classList.toggle('sub', !!cur.sub);
   document.getElementById('topTitle').textContent = cur.title || '五班英语角';
   document.getElementById('topAct').innerHTML = cur.act || '';
   document.getElementById('tabbar').style.display = cur.sub? 'none':'flex';
   if(typeof markPlaying==='function') markPlaying();
-  window.scrollTo(0,0);
+  /* 语速悬浮钮只在可能有朗读的页面出现，首页和「我的」不需要 */
+  const sw=document.querySelector('.speed-widget-wrap');
+  if(sw) sw.style.display = (!cur.sub && (curTab==='home'||curTab==='me')) ? 'none' : '';
+  window.scrollTo(0,y);
 }
 function buildTabbar(){
   const tb = document.getElementById('tabbar');
@@ -262,6 +267,7 @@ function renderHome(){
   const name=LS.get('displayName','')||'用户';
   const studied=LS.get('studiedWords',[]).length;
   const phraseTotal=allPhrases().length, phraseStudied=LS.get('studiedPhrases',[]).length;
+  const mapNodes=buildMapNodes(), mapDone=mapNodes.filter(nodeCompleted).length, nxt=nextNode();
   const xp = (typeof totalXP==='function') ? totalXP() : 0;
   const level = (typeof userLevel==='function') ? userLevel() : 1;
   const {w,p}=dailyPick();
@@ -292,6 +298,17 @@ function renderHome(){
       </div>
     </div>
 
+    <div class="continue-card" onclick="continueLearning()">
+      <div class="cc-main">
+        <span class="cc-tag">${nxt?(mapDone===0?'开始闯关':'继续闯关'):'闯关完成'}</span>
+        <div class="cc-title">${nxt?esc(nxt.type==='story'?('情景剧本 · '+nxt.scenario.title):nxt.label):'全部关卡已通关'}</div>
+        <div class="cc-sub">${nxt?esc(nxt.unit.titleEn):'可以去自由学习里继续巩固'}</div>
+        <div class="cc-bar"><i style="width:${mapNodes.length?Math.round(mapDone/mapNodes.length*100):0}%"></i></div>
+        <div class="cc-meta">已通关 ${mapDone} / ${mapNodes.length}</div>
+      </div>
+      <div class="cc-go">${icon('play')}</div>
+    </div>
+
     <div class="section" style="margin-top:34rem">
       <div class="section-head"><div class="section-head-left"><span class="section-title">自由学习</span></div><span class="section-sub">点卡片直接开始</span></div>
       <div class="free-row">
@@ -312,20 +329,17 @@ function renderHome(){
       </div>
     </div>
 
-    <div class="quick-grid">
-      <div class="quick-item" onclick="switchTab('words')"><div class="quick-icon t-green">${icon('book')}</div><span class="quick-name">闯关地图</span><span class="quick-desc">6种题型</span></div>
-      <div class="quick-item" onclick="openStoryList()"><div class="quick-icon t-red">${icon('alert')}</div><span class="quick-name">情景剧本</span><span class="quick-desc">真实特情</span></div>
-      <div class="quick-item" onclick="switchTab('speaking')"><div class="quick-icon t-blue">${icon('talk')}</div><span class="quick-name">口语</span><span class="quick-desc">情景练习</span></div>
-      <div class="quick-item" onclick="openReview()"><div class="quick-icon t-pink">${icon('star')}</div><span class="quick-name">生词本</span><span class="quick-desc">错题复习</span></div>
-    </div>
-
     <div class="section">
       <div class="section-head"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">探索更多</span></div><span class="section-sub">更多学习方式</span></div>
       <div class="func-card">
         <div class="func-item" onclick="openDrills()">
           <div class="func-icon t-red">${icon('alert')}</div>
-          <div class="func-info"><span class="func-name">处置实战口语</span><span class="func-desc">30 个机上处置情景，中英对照分类练</span></div>
-          <div class="func-badge">NEW</div><span class="func-arrow">›</span>
+          <div class="func-info"><span class="func-name">处置实战口语</span><span class="func-desc">30 个机上处置情景，中英对照分类练</span></div><div class="func-badge">NEW</div><span class="func-arrow">›</span>
+        </div>
+        <div class="func-divider"></div>
+        <div class="func-item" onclick="openStoryList()">
+          <div class="func-icon t-red">${icon('alert')}</div>
+          <div class="func-info"><span class="func-name">情景剧本</span><span class="func-desc">真实特情，选对处置用语闯关</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="switchTab('security')">
@@ -333,14 +347,19 @@ function renderHome(){
           <div class="func-info"><span class="func-name">空保英语</span><span class="func-desc">民航安保执勤英语，境外场景交流</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
+        <div class="func-item" onclick="openDialogue()">
+          <div class="func-icon t-blue">${icon('drama')}</div>
+          <div class="func-info"><span class="func-name">情景对话</span><span class="func-desc">模拟真实场景，开口说英语</span></div><span class="func-arrow">›</span>
+        </div>
+        <div class="func-divider"></div>
+        <div class="func-item" onclick="openReview()">
+          <div class="func-icon t-green">${icon('star')}</div>
+          <div class="func-info"><span class="func-name">生词本</span><span class="func-desc">错词和不熟的词集中复习</span></div><span class="func-arrow">›</span>
+        </div>
+        <div class="func-divider"></div>
         <div class="func-item" onclick="openChat()">
           <div class="func-icon t-violet">${icon('robot')}</div>
           <div class="func-info"><span class="func-name">答疑小助手</span><span class="func-desc">本地智能检索，单词短句随时查</span></div><span class="func-arrow">›</span>
-        </div>
-        <div class="func-divider"></div>
-        <div class="func-item" onclick="openDialogue()">
-          <div class="func-icon t-teal">${icon('drama')}</div>
-          <div class="func-info"><span class="func-name">情景对话</span><span class="func-desc">模拟真实场景，开口说英语</span></div><span class="func-arrow">›</span>
         </div>
       </div>
     </div>
@@ -372,6 +391,15 @@ function renderHome(){
     </div>
     <div class="safe"></div>
   </div>`;
+}
+function nextNode(){
+  const nodes=buildMapNodes();
+  return nodes.find((n,i)=>nodeUnlocked(i,nodes) && !nodeCompleted(n)) || null;
+}
+function continueLearning(){
+  const n=nextNode();
+  if(!n){ switchTab('words'); return; }
+  if(n.type==='story') openStory(n.id); else openLesson(n.id);
 }
 function doCheckin(){
   const st=calcStreak(); if(st.checked){ toast('今日已打卡'); return; }
