@@ -518,7 +518,7 @@ function renderLessonResult(){
   const xp = (s.gainedXp!=null) ? s.gainedXp : (s.correct*10 + stars*20);
   const missed = (s.missedWords||[]).length;
   return `<div class="view" style="text-align:center">
-    <div style="font-size:60rem;margin:20rem 0;animation:pop .5s ease;">🎉</div>
+    <div class="result-ico ok">${icon('trophy')}</div>
     <div style="font-size:19px;font-weight:800;">关卡完成！</div>
     <div class="result-stars">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</div>
     <div class="result-stat-row">
@@ -527,7 +527,7 @@ function renderLessonResult(){
       <div class="result-stat"><b>${s.hearts}</b><span>剩余生命</span></div>
     </div>
     ${missed ? `<div class="card" style="margin:18rem 0 24rem;text-align:left">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6rem">📌 本关有 ${missed} 个词已自动加入生词本</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:6rem">本关有 ${missed} 个词已自动加入生词本</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.6">${(s.missedWords||[]).map(w=>esc(w)).join('、')}</div>
     </div>` : ''}
     <button class="btn gold" onclick="finishLessonExit()">继续闯关</button>
@@ -539,11 +539,11 @@ function renderLessonResult(){
 function finishLessonExit(){ lessonSession=null; goBack(); switchTab('words'); }
 function renderLessonFail(){
   return `<div class="view" style="text-align:center">
-    <div style="font-size:60rem;margin:20rem 0;">💔</div>
+    <div class="result-ico bad">${icon('heart')}</div>
     <div style="font-size:19px;font-weight:800;">生命值耗尽</div>
     <div style="font-size:13px;color:var(--muted);margin:10rem 0 30rem;">别灰心，再试一次就能掌握这些执勤用语</div>
     ${(lessonSession.missedWords||[]).length ? `<div class="card" style="margin-bottom:24rem;text-align:left">
-      <div style="font-size:13px;font-weight:700;margin-bottom:6rem">📌 答错的 ${lessonSession.missedWords.length} 个词已加入生词本</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:6rem">答错的 ${lessonSession.missedWords.length} 个词已加入生词本</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.6">${lessonSession.missedWords.map(w=>esc(w)).join('、')}</div>
     </div>` : ''}
     <button class="btn gold" onclick="retryLesson('${lessonSession.node.id}')">重新挑战</button>
@@ -632,7 +632,7 @@ function advanceStory(){
 }
 function renderStoryEnd(sc){
   return `<div class="view" style="text-align:center">
-    <div style="font-size:60rem;margin:20rem 0;">🏅</div>
+    <div class="result-ico ok">${icon('badge')}</div>
     <div style="font-size:19px;font-weight:800;">处置完毕</div>
     <div class="story-brief" style="text-align:left;margin-top:20rem;">${esc(sc.endText)}</div>
     <div style="font-size:13px;color:var(--gold-dark);font-weight:700;margin:20rem 0;">+80 XP</div>

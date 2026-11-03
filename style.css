@@ -1,20 +1,22 @@
 /* ===========================================================
    五班英语角 · 空保执勤英语 —— style.css
-   视觉语言：深藏青 + 金色点缀（安保权威感）+ 清爽卡片信息层
+   视觉语言 v2：墨蓝 + 琥珀强调色，扁平卡片 + 细边框
 =========================================================== */
 .speakable{cursor:pointer;}
 .speakable:active{opacity:.6;}
 :root{
-  --navy-950:#0a1830; --navy-900:#0f2544; --navy-800:#16324f; --navy-700:#1d3f63;
-  --gold:#d4af37; --gold-light:#f2d27a; --gold-dark:#a8842a;
-  --green:#1a9152; --green2:#22c55e; --green-d:#137a43;
-  --red:#e0483f; --red-light:#fde8e6;
-  --blue:#2563eb;
-  --bg:#f3f5f9; --card:#ffffff; --text:#132036; --muted:#6b7688; --line:#e9ecf2;
-  --shadow-sm:0 2px 8px rgba(15,37,68,.06);
-  --shadow-md:0 8px 24px rgba(15,37,68,.10);
-  --shadow-gold:0 8px 22px rgba(212,175,55,.28);
-  --radius:20px;
+  /* v2：墨蓝 + 单一琥珀强调色；扁平、细边框、少阴影 */
+  --navy-950:#0b1424; --navy-900:#111d33; --navy-800:#1c2b47; --navy-700:#2c3d5e;
+  --gold:#f0a82e; --gold-light:#fbe3b0; --gold-dark:#a8680c;
+  --accent:#f0a82e; --accent-soft:#fdf1d8;
+  --green:#23805a; --green2:#34b27b; --green-d:#1b6b49;
+  --red:#d94a3f; --red-light:#fdeceb;
+  --blue:#2f62e0;
+  --bg:#f6f5f1; --card:#ffffff; --text:#111a2c; --muted:#6c7383; --line:#e8e7e1;
+  --shadow-sm:0 1px 2px rgba(17,26,44,.04);
+  --shadow-md:0 6px 20px rgba(17,26,44,.07);
+  --shadow-gold:none;
+  --radius:18px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{font-size:0.133333vw;}
@@ -493,3 +495,162 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .gate-foot{margin-top:26px;font-size:11px;opacity:.5;line-height:1.6;}
 /* 斜向平铺的淡水印：不挡点击、不影响排版 */
 #wbMark{position:fixed;inset:0;z-index:40;pointer-events:none;font-size:0;color:transparent;background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='150'%3E%3Ctext x='110' y='80' text-anchor='middle' transform='rotate(-24 110 75)' font-size='13' font-family='PingFang SC,Microsoft YaHei,sans-serif' fill='%230f2544' fill-opacity='0.055'%3E%E5%86%85%E9%83%A8%E5%AD%A6%E4%B9%A0%E8%B5%84%E6%96%99 %C2%B7 %E8%AF%B7%E5%8B%BF%E5%A4%96%E4%BC%A0%3C/text%3E%3C/svg%3E");background-repeat:repeat;}
+
+/* ===========================================================
+   v2 设计层：覆盖旧的渐变 / 发光 / 重阴影，统一成扁平、细边框
+=========================================================== */
+body{-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1;letter-spacing:.1px;}
+.topbar{background:rgba(246,245,241,.88);border-bottom:1rem solid var(--line);}
+.topbar .title{font-weight:650;font-size:16px;}
+.topbar .act{color:var(--navy-800);}
+
+/* --- 图标底块：柔和色底 + 同色系线条图标，取代高饱和渐变方块 --- */
+.quick-icon,.func-icon,.story-list-icon{background:#eceff5;color:var(--navy-800);box-shadow:none;}
+.t-green{background:#e3f3ea!important;color:#1b6b49!important;}
+.t-red{background:#fbe6e3!important;color:#b53a30!important;}
+.t-blue{background:#e4ecfc!important;color:#2a54c4!important;}
+.t-pink{background:#fbe7f0!important;color:#b8386d!important;}
+.t-navy{background:#e6e9f1!important;color:#1c2b47!important;}
+.t-violet{background:#ece8fb!important;color:#5b43c4!important;}
+.t-teal{background:#dff3f1!important;color:#12756c!important;}
+.quick-icon,.func-icon,.story-list-icon{border-radius:22rem;}
+.quick-icon .icon,.func-icon .icon,.story-list-icon .icon{stroke-width:1.8;}
+.story-list-icon.drill-ic-ground{background:#e4ecfc;color:#2a54c4;}
+.story-list-icon.drill-ic-order{background:#e3f3ea;color:#1b6b49;}
+.story-list-icon.drill-ic-violation{background:#fdf1d8;color:#a8680c;}
+.story-list-icon.drill-ic-conflict{background:#fbe6e3;color:#b53a30;}
+.story-list-icon.drill-ic-control{background:#ece8fb;color:#5b43c4;}
+.story-list-icon.drill-ic-report{background:#e6e9f1;color:#1c2b47;}
+
+/* --- 首页 hero：平面墨蓝，去掉金色光晕 --- */
+.welcome-card{background:var(--navy-900);border-radius:26rem;box-shadow:none;padding:34rem 32rem;}
+.welcome-card::after{display:none;}
+.welcome-avatar{background:rgba(255,255,255,.12);color:#fff;box-shadow:none;border:1rem solid rgba(255,255,255,.14);font-weight:700;}
+.welcome-greeting{font-size:17px;font-weight:650;}
+.status-dot{background:var(--accent);width:12rem;height:12rem;}
+.status-dot.done{background:#5fd39a;}
+.date-day{font-size:28px;font-weight:700;}
+.date-week{opacity:.6;}
+.welcome-stats{background:transparent;border:none;border-top:1rem solid rgba(255,255,255,.12);border-radius:0;
+  margin-top:28rem;padding:26rem 0 0;}
+.stat-num{color:#fff;font-size:26px;font-weight:700;}
+.stat-label{opacity:.6;font-size:11px;}
+.stat-dot{background:rgba(255,255,255,.12);width:1rem;}
+
+/* --- 快捷入口 / 列表卡：细边框代替阴影 --- */
+.quick-item,.func-card,.checkin-card,.card,.list-item,.story-list-card,.sec-cat,.qa-item,.drill-scene-card,.drill-howto>div,.story-brief{
+  box-shadow:none;border:1rem solid var(--line);}
+.quick-item{border-radius:20rem;}
+.quick-name{font-weight:650;}
+.section-head-bar{display:none;}
+.section-title{font-size:17px;font-weight:700;letter-spacing:.2px;}
+.section-sub{color:var(--muted);}
+.func-name{font-weight:650;}
+.func-badge{background:var(--accent-soft);color:var(--gold-dark);letter-spacing:.4px;}
+.func-arrow,.arrow-item .func-arrow{color:#c9c9c2;}
+.func-divider{background:var(--line);}
+.story-list-card.soft{background:#fff;}
+
+/* --- 每日卡片：浅色卡 + 大字，不再用大块深色渐变 --- */
+.daily-card{box-shadow:none;border:1rem solid var(--line);color:var(--text);background:#fff;}
+.word-card,.phrase-card{background:#fff;}
+.word-card{border-top:5rem solid #34b27b;}
+.phrase-card{border-top:5rem solid var(--accent);}
+.daily-card-tag{background:#f1f0eb;color:var(--muted);}
+.daily-card-word{font-size:22px;font-weight:750;color:var(--navy-900);}
+.daily-card-phonetic{opacity:1;color:var(--muted);}
+.daily-card-meaning{color:var(--text);}
+.daily-card-example{opacity:1;color:var(--muted);}
+.daily-card-en{color:var(--navy-900);}
+.daily-card-cn{opacity:1;color:var(--muted);}
+
+/* --- 打卡周条 --- */
+.week-dot{background:#f0efea;}
+.week-day.done .week-dot{background:var(--green2);}
+.week-day.today .week-label{color:var(--navy-900);}
+.week-day.today .week-dot{box-shadow:0 0 0 3rem var(--accent);}
+
+/* --- 按钮：实心扁平 --- */
+.btn{background:var(--navy-900);box-shadow:none;border-radius:16rem;font-weight:650;}
+.btn.gold{background:var(--accent);color:#1b1305;box-shadow:none;}
+.btn.done{background:#e3f3ea;color:var(--green);}
+.btn.ghost{background:#fff;color:var(--text);border:1rem solid var(--line);}
+.btn.amber{background:var(--accent-soft);color:var(--gold-dark);}
+.btn.danger{background:var(--red);}
+.btn .icon{margin-right:6rem;}
+.setting-save{background:var(--navy-900);}
+
+/* --- 底部导航 --- */
+.tabbar{background:rgba(255,255,255,.92);border-top:1rem solid var(--line);}
+.tab{position:relative;color:#8b909c;}
+.tab.active{color:var(--navy-900);font-weight:650;}
+.tab.active .icon{stroke:var(--navy-900);}
+.tab.active::before{content:'';position:absolute;top:0;left:50%;width:36rem;height:5rem;margin-left:-18rem;border-radius:0 0 6rem 6rem;background:var(--accent);}
+
+/* --- chips / 分段 --- */
+.chip{background:#fff;}
+.chip.active{background:var(--navy-900);border-color:var(--navy-900);}
+.seg{background:#ecebe5;}
+.seg button.active{box-shadow:0 1rem 3rem rgba(0,0,0,.08);}
+
+/* --- 进度条：单色 --- */
+.progress-bar>i,.drill-prog.sm>i{background:var(--accent);}
+.drill-prog>i{background:var(--accent);}
+.progress-bar{background:#ebeae4;}
+
+/* --- 闯关地图 --- */
+.map-unit-head{background:var(--navy-900);box-shadow:none;}
+.map-unit-head.locked{background:#a9acb4;opacity:.7;}
+.map-node{background:var(--accent);color:var(--navy-950);box-shadow:0 0 0 6rem rgba(240,168,46,.22);border:4rem solid #fff;}
+.map-node.done{background:var(--green2);color:#fff;box-shadow:0 0 0 6rem rgba(52,178,123,.2);}
+.map-node.locked{background:#e4e3dd;color:#a6a8ae;box-shadow:none;}
+.map-node.story{background:var(--red);color:#fff;box-shadow:0 0 0 6rem rgba(217,74,63,.18);}
+.map-connector{background:#e4e3dd;}
+.map-connector.done{background:var(--green2);}
+
+/* --- 单词卡 / 练习 --- */
+.flash,.ex-card,.quiz-q{box-shadow:none;border:1rem solid var(--line);}
+.flash-cat{background:#f1f0eb;color:var(--muted);}
+.flash-word{font-weight:750;letter-spacing:.3rem;}
+.ex-kicker{color:var(--gold-dark);}
+.ex-token{background:var(--navy-900);}
+.ex-match-item.selected{border-color:var(--accent);background:var(--accent-soft);}
+.result-ring{background:conic-gradient(var(--accent) var(--pct),#e8e7e1 0);}
+.result-ico{width:96rem;height:96rem;border-radius:50%;margin:20rem auto;display:flex;align-items:center;justify-content:center;font-size:44rem;animation:pop .5s ease;}
+.result-ico.ok{background:var(--accent-soft);color:var(--gold-dark);}
+.result-ico.bad{background:var(--red-light);color:var(--red);}
+.empty .big{font-size:56rem;color:#c4c4bd;}
+
+/* --- 剧情 --- */
+.story-cover.scene-cabin{background:#1c2b47;}
+.story-cover.scene-checkpoint{background:#2b3340;}
+.story-cover.scene-gate{background:#1f3b34;}
+.story-cover.scene-cockpit{background:#4a2c1d;}
+.story-narration{background:var(--accent-soft);border-color:#f1dcab;color:#6e4a0c;}
+.drill-brief{border-left-color:var(--accent);box-shadow:none;border-top:1rem solid var(--line);border-right:1rem solid var(--line);border-bottom:1rem solid var(--line);}
+
+/* --- 播放按钮：纯色，播放中变琥珀 --- */
+.play[data-pk],.b-play,.flash-play,.drill-listen,.pbtn-in,.bubble .b-play:not(.is-playing){background:var(--navy-900);box-shadow:none;}
+.play.is-playing,.b-play.is-playing,.flash-play.is-playing,.drill-listen.is-playing,.pbtn-in.is-playing{background:var(--accent);color:var(--navy-950);}
+.play.is-playing::after,.b-play.is-playing::after,.flash-play.is-playing::after,.drill-listen.is-playing::after,.pbtn-in.is-playing::after{border-color:var(--accent);}
+.chip-pi.on{background:var(--accent);color:var(--navy-950);}
+.speed-fab{background:var(--navy-900);box-shadow:var(--shadow-md);}
+
+/* --- 对话气泡 / 聊天 --- */
+.bubble.right{background:#e8eefc;}
+.chat-msg.me{background:var(--navy-900);}
+.chat-bar{background:rgba(255,255,255,.96);}
+
+/* --- 安装横幅 / 弹窗 --- */
+.install-banner{background:var(--navy-900);box-shadow:none;}
+.install-banner-ic{background:rgba(255,255,255,.1);color:var(--accent);}
+.install-banner-btn{background:var(--accent);color:var(--navy-950);}
+.modal-card{box-shadow:var(--shadow-md);}
+.modal-step-ic{background:var(--accent-soft);}
+
+/* --- 进入页 --- */
+#gate{background:var(--navy-900);}
+.gate-logo{box-shadow:none;border-radius:22px;}
+.gate-title{font-weight:700;}
+.gate-input{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);}
+.gate-btn{background:var(--accent);color:#1b1305;box-shadow:none;font-weight:700;}

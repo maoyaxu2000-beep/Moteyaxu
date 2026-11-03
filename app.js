@@ -182,10 +182,10 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
    空保英语的核心难点：同一个意思，对驾驶舱说 / 对旅客说 / 写进报告，说法完全不同。
    词库里每个词都标了 usage，这里把它显示出来并支持筛选。 */
 const USAGE_META = {
-  radio:{ label:'无线电', icon:'📻', desc:'对驾驶舱/机组通话，简短、格式化' },
-  face: { label:'当面',   icon:'👤', desc:'当面对旅客说，清晰、有礼但有力' },
-  write:{ label:'书面',   icon:'📄', desc:'笔录、报告、移交文书用语' },
-  life: { label:'生活',   icon:'🏨', desc:'外站驻留、日常交际' }
+  radio:{ label:'无线电', icon:icon('radio'), desc:'对驾驶舱/机组通话，简短、格式化' },
+  face: { label:'当面',   icon:icon('user'), desc:'当面对旅客说，清晰、有礼但有力' },
+  write:{ label:'书面',   icon:icon('book'), desc:'笔录、报告、移交文书用语' },
+  life: { label:'生活',   icon:icon('hotel'), desc:'外站驻留、日常交际' }
 };
 function usageTag(u){
   const m = USAGE_META[u];
@@ -292,33 +292,33 @@ function renderHome(){
     </div>
 
     <div class="quick-grid">
-      <div class="quick-item" onclick="switchTab('words')"><div class="quick-icon" style="background:linear-gradient(135deg,#4ade80,#22c55e)">${icon('book')}</div><span class="quick-name">闯关地图</span><span class="quick-desc">6种题型</span></div>
-      <div class="quick-item" onclick="openStoryList()"><div class="quick-icon" style="background:linear-gradient(135deg,#f87171,#b91c1c)">${icon('alert')}</div><span class="quick-name">情景剧本</span><span class="quick-desc">真实特情</span></div>
-      <div class="quick-item" onclick="switchTab('speaking')"><div class="quick-icon" style="background:linear-gradient(135deg,#60a5fa,#3b82f6)">${icon('talk')}</div><span class="quick-name">口语</span><span class="quick-desc">情景练习</span></div>
-      <div class="quick-item" onclick="openReview()"><div class="quick-icon" style="background:linear-gradient(135deg,#f472b6,#ec4899)">${icon('star')}</div><span class="quick-name">生词本</span><span class="quick-desc">错题复习</span></div>
+      <div class="quick-item" onclick="switchTab('words')"><div class="quick-icon t-green">${icon('book')}</div><span class="quick-name">闯关地图</span><span class="quick-desc">6种题型</span></div>
+      <div class="quick-item" onclick="openStoryList()"><div class="quick-icon t-red">${icon('alert')}</div><span class="quick-name">情景剧本</span><span class="quick-desc">真实特情</span></div>
+      <div class="quick-item" onclick="switchTab('speaking')"><div class="quick-icon t-blue">${icon('talk')}</div><span class="quick-name">口语</span><span class="quick-desc">情景练习</span></div>
+      <div class="quick-item" onclick="openReview()"><div class="quick-icon t-pink">${icon('star')}</div><span class="quick-name">生词本</span><span class="quick-desc">错题复习</span></div>
     </div>
 
     <div class="section">
       <div class="section-head"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">探索更多</span></div><span class="section-sub">更多学习方式</span></div>
       <div class="func-card">
         <div class="func-item" onclick="openDrills()">
-          <div class="func-icon" style="background:linear-gradient(135deg,#f87171,#b91c1c 55%,#7f1d1d)">${icon('alert')}</div>
+          <div class="func-icon t-red">${icon('alert')}</div>
           <div class="func-info"><span class="func-name">处置实战口语</span><span class="func-desc">30 个机上处置情景，中英对照分类练</span></div>
           <div class="func-badge">NEW</div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="switchTab('security')">
-          <div class="func-icon" style="background:linear-gradient(135deg,#1e3a5f,#1a5276 50%,#0f2544)">${icon('shield')}</div>
+          <div class="func-icon t-navy">${icon('shield')}</div>
           <div class="func-info"><span class="func-name">空保英语</span><span class="func-desc">民航安保执勤英语，境外场景交流</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="openChat()">
-          <div class="func-icon" style="background:linear-gradient(135deg,#a78bfa,#7c3aed 50%,#6366f1)">${icon('robot')}</div>
+          <div class="func-icon t-violet">${icon('robot')}</div>
           <div class="func-info"><span class="func-name">答疑小助手</span><span class="func-desc">本地智能检索，单词短句随时查</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="openDialogue()">
-          <div class="func-icon" style="background:linear-gradient(135deg,#2dd4bf,#0d9488 50%,#0891b2)">${icon('drama')}</div>
+          <div class="func-icon t-teal">${icon('drama')}</div>
           <div class="func-info"><span class="func-name">情景对话</span><span class="func-desc">模拟真实场景，开口说英语</span></div><span class="func-arrow">›</span>
         </div>
       </div>
@@ -346,7 +346,7 @@ function renderHome(){
       <div class="section-head"><div class="section-head-left"><div class="section-head-bar green"></div><span class="section-title">本周学习</span></div>${st.streak>0?`<span class="section-sub">${icon('flame')} 连续 ${st.streak} 天</span>`:''}</div>
       <div class="checkin-card">
         <div class="week-row">${week}</div>
-        <button class="btn ${st.checked?'done':'gold'}" onclick="doCheckin()">${st.checked?'✅ 今日已完成':'🎯 立即打卡'}</button>
+        <button class="btn ${st.checked?'done':'gold'}" onclick="doCheckin()">${st.checked?icon('check')+' 今日已完成':'立即打卡'}</button>
       </div>
     </div>
     <div class="safe"></div>
@@ -356,7 +356,7 @@ function doCheckin(){
   const st=calcStreak(); if(st.checked){ toast('今日已打卡'); return; }
   const hist=LS.get('checkinHistory',[]); hist.push(st.today); LS.set('checkinHistory',hist); LS.set('lastCheckinDate',st.today);
   if(typeof addXP==='function') addXP(15);
-  toast('打卡成功 🎉 +15 XP'); refresh();
+  toast('打卡成功 · +15 XP'); refresh();
 }
 
 /* =========================================================
@@ -375,7 +375,7 @@ function renderWordsMenu(){
       <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学单词</div></div>
       <div class="card" style="text-align:center" onclick="openReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">生词本 ›</div></div>
     </div>
-    <button class="btn gold" style="margin-top:20rem;" onclick="openQuiz()">📝 开始单词测试</button>
+    <button class="btn gold" style="margin-top:20rem;" onclick="openQuiz()">开始单词测试</button>
 
     <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">按使用场景练</span></div><span class="section-sub">同义不同说法</span></div>
     <div class="card" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14rem">
@@ -413,7 +413,7 @@ function openReview(){
   navigate(renderFlash,'生词本 ('+list.length+')','');
 }
 function renderFlash(){
-  const s=wordSession; if(!s||!s.list.length) return `<div class="view"><div class="empty"><span class="big">📭</span>暂无单词</div></div>`;
+  const s=wordSession; if(!s||!s.list.length) return `<div class="view"><div class="empty"><span class="big">${icon('book')}</span>暂无单词</div></div>`;
   const w=s.list[s.idx]; const pct=Math.round((s.idx+1)/s.list.length*100);
   const reviewMode=s.mode==='review';
   return `<div class="view">
@@ -436,7 +436,7 @@ function renderFlash(){
     <div class="flash-actions">
       ${reviewMode
         ? `<button class="btn ghost" onclick="removeWrong()">✓ 已掌握移除</button><button class="btn gold" onclick="nextWord()">下一个 ›</button>`
-        : `<button class="btn amber" onclick="addWrong()">★ 加入生词本</button><button class="btn gold" onclick="markKnownNext()">认识 · 下一个</button>`}
+        : `<button class="btn amber" onclick="addWrong()">${icon('star')} 加入生词本</button><button class="btn gold" onclick="markKnownNext()">认识 · 下一个</button>`}
     </div>
     <div class="safe"></div>
   </div>`;
@@ -446,7 +446,7 @@ function nextWord(){ const s=wordSession; if(s.idx<s.list.length-1){ s.idx++; s.
 function markKnownNext(){ const w=wordSession.list[wordSession.idx]; const set=new Set(LS.get('studiedWords',[])); set.add(w.word); LS.set('studiedWords',[...set]); nextWord(); }
 function addWrong(){ const w=wordSession.list[wordSession.idx]; const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===w.word)){ arr.push(w); LS.set('wrongWords',arr); toast('已加入生词本'); } else toast('已在生词本中'); }
 function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); } else refresh(); }
-function finishWords(){ toast('本组学习完成 🎉'); goBack(); }
+function finishWords(){ toast('本组学习完成'); goBack(); }
 
 /* =========================================================
    SPEAKING (口语短句)
@@ -592,13 +592,13 @@ function renderSecurity(){
       <div style="font-size:18px;font-weight:800;">${icon('shield')} 空保英语</div>
       <div style="font-size:12px;opacity:.85;margin-top:8rem">民航客舱安保 · 机场执勤 · 境外过夜场景</div>
     </div>
-    <div class="story-list-card" onclick="openDrills()" style="margin-top:22rem;background:linear-gradient(135deg,#eef4ff,#fff);border:1rem solid #d6e2fb;">
-      <div class="story-list-icon" style="background:linear-gradient(135deg,#60a5fa,#1d4ed8);">${icon('talk')}</div>
+    <div class="story-list-card soft" onclick="openDrills()" style="margin-top:22rem">
+      <div class="story-list-icon t-blue">${icon('talk')}</div>
       <div class="li-main"><div class="li-en">处置实战口语 <span class="func-badge" style="margin-left:6rem">NEW</span></div><div class="li-cn">30个机上处置情景 · 分6类 · 中英对照+口语练习</div></div>
       <span class="func-arrow">›</span>
     </div>
-    <div class="story-list-card" onclick="openStoryList()" style="background:linear-gradient(135deg,#fff6e0,#fff);border:1rem solid #f2e2b0;">
-      <div class="story-list-icon" style="background:linear-gradient(135deg,#f87171,#b91c1c);">${icon('alert')}</div>
+    <div class="story-list-card soft" onclick="openStoryList()">
+      <div class="story-list-icon t-red">${icon('alert')}</div>
       <div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">还原12种真实特情处置全过程</div></div>
       <span class="func-arrow">›</span>
     </div>`;
@@ -635,7 +635,7 @@ function openSecCat(pi,ci){
 /* =========================================================
    CHAT (答疑小助手 - 本地检索)
 ========================================================= */
-let chatLog=[{from:'bot',text:'你好！我是答疑小助手 🤖\n输入中文或英文关键词，我会帮你找出相关的单词和常用句。例如：「安全带」「passport」「行李」。'}];
+let chatLog=[{from:'bot',text:'你好！我是答疑小助手\n输入中文或英文关键词，我会帮你找出相关的单词和常用句。例如：「安全带」「passport」「行李」。'}];
 function openChat(){ navigate(renderChat,'答疑小助手',''); }
 function renderChat(){
   let html=`<div class="view" style="padding-bottom:120rem"><div class="chat-wrap">`;
@@ -691,7 +691,7 @@ function renderMe(){
   const level = (typeof userLevel==='function') ? userLevel() : 1;
   return `<div class="view">
     <div class="card" style="display:flex;align-items:center;gap:20rem">
-      <div class="welcome-avatar" style="background:linear-gradient(135deg,var(--navy-800),var(--navy-950));color:#fff">${esc((name[0]||'游'))}</div>
+      <div class="welcome-avatar">${esc((name[0]||'游'))}</div>
       <div><div style="font-size:16px;font-weight:800">${esc(name||'游客')}</div><div style="font-size:12px;color:var(--muted)">五班英语角 · 空保英语 · Lv.${level}</div></div>
     </div>
     <div class="card" style="margin-top:20rem">
@@ -720,7 +720,7 @@ function renderMe(){
     </div>
     <div class="list-item arrow-item" style="margin-top:20rem" onclick="switchTab('words')"><div class="play" style="background:#fff6e0;color:var(--gold-dark)">${icon('book')}</div><div class="li-main"><div class="li-en">闯关地图</div><div class="li-cn">继续学习进度</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openStoryList()"><div class="play" style="background:#fee2e2;color:#b91c1c">${icon('alert')}</div><div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">真实特情处置</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">★</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">${icon('star')}</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openQuiz()"><div class="play" style="background:#fdebf4;color:#ec4899">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openChat()"><div class="play" style="background:#efeafe;color:#7c3aed">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="accessLogout()"><div class="play" style="background:#f1f5f9;color:var(--navy-800)">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">${accessNote()}</div></div><span class="func-arrow">›</span></div>
