@@ -102,6 +102,62 @@ const { serve, launch, check, done } = require('./lib');
   check('回车后记入最近查过', await ev(() => LS.get('recentSearch', []).includes('passport')));
   await ev(() => goBack());
 
+  console.log('· 备份与恢复');
+  await ev(() => { LS.set('xp', 300); LS.set('lessonProgress', { 'u1-l1': { stars: 3, xp: 80 } }); LS.set('displayName', '测试员');
+    LS.set('drillMastery', { 'd1-0': 111 }); LS.set('drillWeak', { 'd1-1': 222 }); LS.set('checkinHistory', ['2026-10-01', '2026-10-02']);
+    LS.set('studiedPhrases', ['Please remain seated.']); LS.set('phraseDir', 'en2cn'); });
+  const snap = await ev(() => ({ sw: LS.get('studiedWords', []), srs: LS.get('srs', {}), favs: favList().map(f => f.en).sort(), xp: LS.get('xp', 0) }));
+  const code = await ev(() => encodeBackup());
+  check('备份码为压缩格式 WB2', code.startsWith('WB2.'), code.slice(0, 12));
+  check('备份码体积合理（< 6KB）', code.length < 6000, code.length);
+  check('备份码不含邀请码相关字段', !/wbAccess|wbActivated/.test(await ev(() => JSON.stringify(backupData()))));
+  /* 清空本机 → 导入 → 与备份前一致 */
+  await ev(() => { localStorage.clear(); });
+  const sum = await ev(async c => mergeBackup(await decodeBackup(c)), code);
+  const after = await ev(() => ({ sw: LS.get('studiedWords', []), srs: LS.get('srs', {}), favs: favList().map(f => f.en).sort(), xp: LS.get('xp', 0),
+    lp: LS.get('lessonProgress', {}), name: LS.get('displayName', ''), dm: LS.get('drillMastery', {}), dw: LS.get('drillWeak', {}), ck: LS.get('checkinHistory', []),
+    sp: LS.get('studiedPhrases', []), dir: LS.get('phraseDir', '') }));
+  check('已学单词完整还原', JSON.stringify(after.sw.slice().sort()) === JSON.stringify(snap.sw.slice().sort()));
+  check('复习计划完整还原', JSON.stringify(after.srs) === JSON.stringify(snap.srs));
+  check('收藏、经验、关卡、名字还原', JSON.stringify(after.favs) === JSON.stringify(snap.favs) && after.xp === 300 && after.lp['u1-l1'].stars === 3 && after.name === '测试员', after);
+  check('处置句掌握/待复习还原', after.dm['d1-0'] === 111 && after.dw['d1-1'] === 222);
+  check('短语进度、打卡、设置还原', after.sp[0] === 'Please remain seated.' && after.ck.length === 2 && after.dir === 'en2cn', after);
+  check('合并结果有统计', typeof sum.words === 'number' && sum.words === snap.sw.length, sum);
+  /* 合并不覆盖：本机星级更高就保留；处置句取更新的一方 */
+  await ev(() => { LS.set('lessonProgress', { 'u1-l1': { stars: 3, xp: 80 }, 'u1-l2': { stars: 1, xp: 10 } }); LS.set('xp', 999); LS.set('drillMastery', {}); LS.set('drillWeak', { 'd1-0': 999 }); });
+  await ev(async c => mergeBackup(await decodeBackup(c)), code);
+  const m2 = await ev(() => ({ lp: LS.get('lessonProgress', {}), xp: LS.get('xp', 0), dm: LS.get('drillMastery', {}), dw: LS.get('drillWeak', {}) }));
+  check('合并保留本机更高的经验值和已有关卡', m2.xp === 999 && m2.lp['u1-l2'].stars === 1 && m2.lp['u1-l1'].stars === 3);
+  check('处置句以较新的记录为准', m2.dw['d1-0'] === 999 && !m2.dm['d1-0'], m2);
+  /* 坏输入 */
+  const errTxt = async t => ev(async x => { try{ await decodeBackup(x); return ''; }catch(e){ return e.message; } }, t);
+  check('截断的备份码被识别', (await errTxt(code.slice(0, code.length - 40))).includes('不完整'));
+  check('乱写的内容被拒绝', (await errTxt('hello world')).includes('不是五班英语角'));
+  check('中间夹了换行/空格也能识别', (await errTxt(code.replace(/(.{60})/g, '$1\n  '))) === '');
+  const evil = await ev(() => { try{ mergeBackup({ app: 'wuban', d: { sw: 'x', lp: [], srs: { 'w:word1': 'bad', 'zz': [1, 'a', 2] }, dm: 5, fv: [1, null, ['ok', 5, 'x']], ck: [1, 'abc'], xp: 'NaN', set: 7 } }); return 'ok'; }catch(e){ return String(e); } });
+  check('损坏的备份数据不会让程序出错', evil === 'ok', evil);
+  await ev(() => { openBackup(); });
+  await page.waitForFunction(() => { const t = document.getElementById('bkOut'); return t && t.value.startsWith('WB'); });
+  check('备份页生成备份码', true);
+  await ev(() => goBack());
+
+  console.log('· 外观与关于');
+  await ev(() => setTheme('dark'));
+  check('深色：data-theme=dark', await ev(() => document.documentElement.dataset.theme) === 'dark');
+  await ev(() => setTheme('light'));
+  check('浅色：data-theme=light', await ev(() => document.documentElement.dataset.theme) === 'light');
+  await ev(() => setTheme('auto'));
+  check('跟随系统（测试环境为浅色）', await ev(() => document.documentElement.dataset.theme) === 'light');
+  await ev(() => openAbout());
+  await page.waitForSelector('.about-row');
+  const dt = await ev(() => diagText());
+  check('诊断信息含版本号', dt.includes('五班英语角 v'));
+  check('诊断信息不含邀请码/密钥字段', !/wbAccess|"k":|code/i.test(dt));
+  await ev(() => goBack());
+  await ev(() => switchTab('me'));
+  check('我的页有备份、收藏、外观入口', await page.locator('text=进度备份与恢复').count() >= 1 && await page.locator('text=我的收藏').count() >= 1 && await page.locator('text=跟随系统').count() === 1);
+  await ev(() => switchTab('home'));
+
   console.log('· 其它页面不报错');
   await ev(() => openStoryList());
   await ev(() => switchTab('speaking'));

@@ -425,3 +425,314 @@ function searchRemember(){
 function searchFill(q){ const i = document.getElementById('sIn'); if(!i) return; i.value = q; searchRender(q); searchRemember(); }
 function searchClear(){ const i = document.getElementById('sIn'); if(!i) return; i.value = ''; searchRender(''); i.focus(); }
 function searchClearRecent(){ LS.set('recentSearch', []); const i = document.getElementById('sIn'); searchRender(i ? i.value : ''); }
+
+/* =========================================================
+   3. 进度备份与恢复
+   学习记录只存在这台手机的浏览器里：换手机、清理浏览器数据、iPhone 长期不打开网页版都可能丢。
+   这里把进度压成一段「备份码」，复制到微信文件传输助手就能带走；在新设备粘贴即可合并回来。
+   · 不含邀请码、密钥（那些在 wb 开头的键里，从不导出）
+   · 导入是「合并」不是「覆盖」：本机已有的进度不会被冲掉，两边取更好的
+   · 带校验：复制不全会提示，不会导入一半
+========================================================= */
+function b64uEnc(u8){
+  let s = ''; for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64uDec(t){
+  t = t.replace(/-/g, '+').replace(/_/g, '/'); while(t.length % 4) t += '=';
+  const s = atob(t), u = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u;
+}
+function fnv8(str){ let h = 0x811c9dc5; for(let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+async function streamBytes(u8, Ctor, fmt){
+  const s = new Blob([u8]).stream().pipeThrough(new Ctor(fmt));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+const BACKUP_SETTINGS = ['phraseDir', 'voiceAccent', 'playRate', 'theme'];
+
+function backupData(){
+  const ph = en => audioKey(en), g = (k, d) => LS.get(k, d);
+  const srs = {};
+  Object.entries(g('srs', {})).forEach(([k, e]) => { srs[k[0] === 'p' ? 'p:' + ph(k.slice(2)) : k] = [e.b, e.d, e.t]; });
+  const set = {}; BACKUP_SETTINGS.forEach(k => { const v = LS.get(k, null); if(v !== null) set[k] = v; });
+  return { app: 'wuban', v: 1, t: Date.now(), d: {
+    n: g('displayName', ''), sw: g('studiedWords', []), ww: g('wrongWords', []).map(w => w.word),
+    sp: g('studiedPhrases', []).map(ph), wp: g('wrongPhrases', []).map(ph),
+    lp: g('lessonProgress', {}), st: g('storyProgress', {}), xp: g('xp', 0),
+    ck: g('checkinHistory', []), dm: g('drillMastery', {}), dw: g('drillWeak', {}),
+    srs, sl: g('srsLog', {}), fv: g('favs', []).map(f => [f.en, f.cn, f.t]), set } };
+}
+/* 压缩（浏览器支持就压，不支持就原样）→ base64url → 加前缀和校验 */
+async function encodeBackup(){
+  let u8 = new TextEncoder().encode(JSON.stringify(backupData())), tag = 'WB1';
+  try{ if(window.CompressionStream){ u8 = await streamBytes(u8, CompressionStream, 'gzip'); tag = 'WB2'; } }catch(e){}
+  const body = b64uEnc(u8);
+  return `${tag}.${fnv8(body)}.${body}`;
+}
+async function decodeBackup(text){
+  const t = String(text || '').replace(/\s+/g, '');
+  const m = t.match(/(WB[12])\.([0-9a-f]{8})\.([A-Za-z0-9_-]+)/);
+  if(!m) throw new Error('这不是五班英语角的备份码，请从「WB2.」开头完整复制');
+  if(fnv8(m[3]) !== m[2]) throw new Error('备份码不完整（可能复制时被截断），请重新完整复制');
+  let u8 = b64uDec(m[3]);
+  if(m[1] === 'WB2'){
+    if(!window.DecompressionStream) throw new Error('当前浏览器不支持解压，请换用较新的 Safari / Chrome / 微信');
+    u8 = await streamBytes(u8, DecompressionStream, 'gzip');
+  }
+  let obj; try{ obj = JSON.parse(new TextDecoder().decode(u8)); }catch(e){ throw new Error('备份码内容损坏，请重新复制'); }
+  if(!obj || obj.app !== 'wuban' || !obj.d) throw new Error('备份码内容不对');
+  return obj;
+}
+
+/* 合并：每一项都先检查类型，坏数据直接忽略，绝不会写坏本机记录 */
+function mergeBackup(b){
+  const d = b.d || {}, sum = {};
+  const strs = a => Array.isArray(a) ? a.filter(x => typeof x === 'string' && x.length < 400) : [];
+  const num = x => (typeof x === 'number' && isFinite(x)) ? x : 0;
+  const pmap = new Map(allPhrases().map(p => [audioKey(p.en), p.en]));
+  const wmap = new Map(WORDS.map(w => [w.word, w]));
+  const union = (key, incoming) => {
+    const cur = LS.get(key, []), set = new Set(cur); let add = 0;
+    incoming.forEach(x => { if(!set.has(x)){ set.add(x); add++; } });
+    LS.set(key, [...set]); return add;
+  };
+  sum.words = union('studiedWords', strs(d.sw).filter(w => wmap.has(w)));
+  sum.phrases = union('studiedPhrases', strs(d.sp).map(h => pmap.get(h)).filter(Boolean));
+  union('wrongPhrases', strs(d.wp).map(h => pmap.get(h)).filter(Boolean));
+  { const cur = LS.get('wrongWords', []), have = new Set(cur.map(w => w.word));
+    strs(d.ww).forEach(w => { if(wmap.has(w) && !have.has(w)){ cur.push(wmap.get(w)); have.add(w); } });
+    LS.set('wrongWords', cur); }
+  { const cur = LS.get('lessonProgress', {}), inc = d.lp && typeof d.lp === 'object' ? d.lp : {}; sum.lessons = 0;
+    Object.keys(inc).forEach(id => { const v = inc[id]; if(!v || typeof v !== 'object') return;
+      const a = cur[id], ns = num(v.stars), nx = num(v.xp);
+      if(!a || ns > a.stars || (ns === a.stars && nx > (a.xp || 0))){ if(!a) sum.lessons++; cur[id] = { stars: ns, xp: nx }; } });
+    LS.set('lessonProgress', cur); }
+  { const cur = LS.get('storyProgress', {}), inc = d.st && typeof d.st === 'object' ? d.st : {};
+    Object.keys(inc).forEach(id => { if(inc[id]) cur[id] = true; }); LS.set('storyProgress', cur); }
+  LS.set('xp', Math.max(LS.get('xp', 0), num(d.xp)));
+  { const hist = new Set(LS.get('checkinHistory', []));
+    strs(d.ck).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)).forEach(x => hist.add(x));
+    const arr = [...hist].sort(); LS.set('checkinHistory', arr);
+    if(arr.length) LS.set('lastCheckinDate', arr[arr.length - 1]); }
+  { const m0 = LS.get('drillMastery', {}), w0 = LS.get('drillWeak', {});
+    const dm = d.dm && typeof d.dm === 'object' ? d.dm : {}, dw = d.dw && typeof d.dw === 'object' ? d.dw : {};
+    new Set([...Object.keys(m0), ...Object.keys(w0), ...Object.keys(dm), ...Object.keys(dw)]).forEach(id => {
+      const tm = Math.max(num(m0[id]), num(dm[id])), tw = Math.max(num(w0[id]), num(dw[id]));
+      delete m0[id]; delete w0[id];
+      if(tm && tm >= tw) m0[id] = tm; else if(tw) w0[id] = tw; });
+    LS.set('drillMastery', m0); LS.set('drillWeak', w0); sum.drills = Object.keys(m0).length; }
+  { const cur = LS.get('srs', {}), inc = d.srs && typeof d.srs === 'object' ? d.srs : {};
+    Object.keys(inc).forEach(k0 => { const e = inc[k0]; if(!Array.isArray(e) || e.length < 3 || typeof e[1] !== 'string') return;
+      let k = k0; if(k0[0] === 'p'){ const en = pmap.get(k0.slice(2)); if(!en) return; k = 'p:' + en; }
+      else if(k0[0] === 'w'){ if(!wmap.has(k0.slice(2))) return; }
+      else if(k0[0] === 'l'){ if(typeof DRILL_LINES !== 'undefined' && !DRILL_LINES[k0.slice(2)]) return; }
+      else return;
+      if(!cur[k] || num(e[2]) > (cur[k].t || 0)) cur[k] = { b: Math.max(0, Math.min(5, num(e[0]))), d: e[1], t: num(e[2]) }; });
+    LS.set('srs', cur); }
+  { const cur = LS.get('srsLog', {}), inc = d.sl && typeof d.sl === 'object' ? d.sl : {};
+    Object.keys(inc).forEach(k => { cur[k] = Math.max(num(cur[k]), num(inc[k])); }); LS.set('srsLog', cur); }
+  { const cur = LS.get('favs', []), have = new Set(cur.map(f => f.k)); sum.favs = 0;
+    (Array.isArray(d.fv) ? d.fv : []).forEach(f => { if(!Array.isArray(f) || typeof f[0] !== 'string' || f[0].length > 400) return;
+      const k = favKey(f[0]); if(have.has(k)) return; have.add(k); sum.favs++;
+      cur.push({ k, en: f[0], cn: String(f[1] || '').slice(0, 400), t: num(f[2]) }); });
+    cur.sort((a, b) => b.t - a.t); LS.set('favs', cur); }
+  if(!LS.get('displayName', '') && typeof d.n === 'string') LS.set('displayName', d.n.slice(0, 20));
+  if(d.set && typeof d.set === 'object') BACKUP_SETTINGS.forEach(k => { if(LS.get(k, null) === null && d.set[k] != null) LS.set(k, d.set[k]); });
+  return sum;
+}
+
+/* ---------- 备份页 ---------- */
+let backupCode = '';
+function openBackup(){
+  backupCode = '';
+  navigate(renderBackup, '进度备份与恢复', '');
+  encodeBackup().then(c => {
+    backupCode = c;
+    const ta = document.getElementById('bkOut'); if(ta) ta.value = c;
+    const sz = document.getElementById('bkSize'); if(sz) sz.textContent = `约 ${(c.length / 1024).toFixed(1)} KB`;
+  });
+}
+function lastBackupText(){
+  const t = LS.get('lastBackup', 0);
+  if(!t) return '还没有备份过';
+  const d = new Date(t); return `上次备份：${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+function renderBackup(){
+  const studied = LS.get('studiedWords', []).length, sp = LS.get('studiedPhrases', []).length, favs = favList().length,
+        dm = Object.keys(LS.get('drillMastery', {})).length, les = Object.keys(LS.get('lessonProgress', {})).length;
+  return `<div class="view">
+    <div class="card">
+      <div class="bk-title">备份我的进度</div>
+      <div class="bk-sub">已学单词 ${studied} · 短语 ${sp} · 处置句 ${dm} · 关卡 ${les} · 收藏 ${favs}<br><span id="bkLast">${lastBackupText()}</span></div>
+      <textarea id="bkOut" class="bk-area" readonly placeholder="正在生成备份码…" onclick="this.select()"></textarea>
+      <div class="bk-sub" style="margin-top:8rem">备份码 <span id="bkSize">生成中…</span> · 不含邀请码，可放心发给自己</div>
+      <div class="bk-row">
+        <button class="btn gold" onclick="backupCopy()">${icon('copy')} 复制备份码</button>
+        <button class="btn ghost" onclick="backupSave()">${icon('download')} 存成文件</button>
+      </div>
+      <div class="bk-tip">建议复制后发到微信「文件传输助手」。换手机、清理浏览器或重新安装前，先备份一次。</div>
+    </div>
+    <div class="card" style="margin-top:20rem">
+      <div class="bk-title">从备份恢复</div>
+      <div class="bk-sub">粘贴备份码，或选择之前存的文件。恢复是「合并」：本机已有的进度不会被覆盖，两边取更好的。</div>
+      <textarea id="bkIn" class="bk-area" placeholder="在这里粘贴以 WB2. 开头的备份码"></textarea>
+      <div class="bk-row">
+        <button class="btn gold" onclick="backupImport()">导入并合并</button>
+        <button class="btn ghost" onclick="document.getElementById('bkFile').click()">选择文件</button>
+      </div>
+      <input id="bkFile" type="file" accept=".txt,text/plain" style="display:none" onchange="backupFile(this)">
+      <div id="bkMsg" class="bk-msg"></div>
+    </div>
+    <div class="card" style="margin-top:20rem">
+      <div class="bk-title">为什么要备份</div>
+      <div class="bk-sub" style="line-height:1.8">学习进度保存在浏览器本地。iPhone 的 Safari 如果很长时间不打开网页版，系统可能清掉它；「添加到主屏幕」后更稳，但换手机、重装系统仍然带不走——备份码可以。</div>
+    </div>
+    <div class="safe"></div></div>`;
+}
+async function backupCopy(){
+  if(!backupCode) backupCode = await encodeBackup();
+  let ok = false;
+  try{ await navigator.clipboard.writeText(backupCode); ok = true; }catch(e){}
+  if(!ok){
+    const ta = document.getElementById('bkOut');
+    if(ta){ ta.removeAttribute('readonly'); ta.focus(); ta.select(); try{ ok = document.execCommand('copy'); }catch(e){} ta.setAttribute('readonly', ''); }
+  }
+  if(ok){ LS.set('lastBackup', Date.now()); const l = document.getElementById('bkLast'); if(l) l.textContent = lastBackupText(); toast('备份码已复制'); }
+  else toast('请长按上面的备份码，选择「全选」后手动复制');
+}
+function backupSave(){
+  const run = async () => {
+    const code = backupCode || await encodeBackup();
+    const d = new Date(), name = `五班英语角备份-${dateStr(d)}.txt`;
+    const blob = new Blob([code], { type: 'text/plain' });
+    try{
+      if(navigator.canShare && navigator.canShare({ files: [new File([blob], name, { type: 'text/plain' })] })){
+        await navigator.share({ files: [new File([blob], name, { type: 'text/plain' })], title: '五班英语角备份' });
+        LS.set('lastBackup', Date.now()); toast('已分享'); return;
+      }
+    }catch(e){ if(e && e.name === 'AbortError') return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    LS.set('lastBackup', Date.now()); toast('已保存文件');
+  };
+  run().catch(() => toast('保存失败，请改用「复制备份码」'));
+}
+function bkMsg(text, bad){ const m = document.getElementById('bkMsg'); if(m){ m.textContent = text; m.className = 'bk-msg' + (bad ? ' bad' : ' ok'); } }
+async function backupImport(){
+  const ta = document.getElementById('bkIn'); if(!ta) return;
+  if(!ta.value.trim()){ bkMsg('请先粘贴备份码', true); return; }
+  try{
+    const obj = await decodeBackup(ta.value);
+    const s = mergeBackup(obj);
+    const when = obj.t ? new Date(obj.t) : null;
+    bkMsg(`合并完成${when ? '（备份于 ' + (when.getMonth() + 1) + '月' + when.getDate() + '日）' : ''}：新增单词 ${s.words}、短语 ${s.phrases}、关卡 ${s.lessons}、收藏 ${s.favs}`, false);
+    ta.value = ''; toast('恢复成功');
+    srsSeedOnce();
+  }catch(e){ bkMsg(e.message || '导入失败', true); }
+}
+function backupFile(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  if(f.size > 2e6){ bkMsg('文件太大，不像是备份文件', true); return; }
+  const r = new FileReader();
+  r.onload = () => { const ta = document.getElementById('bkIn'); if(ta){ ta.value = String(r.result || ''); backupImport(); } };
+  r.readAsText(f); inp.value = '';
+}
+
+/* =========================================================
+   5. 外观（跟随系统 / 浅色 / 深色）· 关于与诊断
+   data-theme 永远是 light 或 dark（跟随系统时由脚本按系统设置写入），样式只需要写一份深色。
+   index.html 头部有同样逻辑的小脚本，首屏绘制前就设好，不会先白后黑闪一下。
+========================================================= */
+function themePref(){ return LS.get('theme', 'auto'); }
+function themeEffective(){
+  const p = themePref();
+  if(p === 'light' || p === 'dark') return p;
+  return (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+function applyTheme(){
+  const t = themeEffective();
+  document.documentElement.setAttribute('data-theme', t);
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', t === 'dark' ? '#0b1424' : '#111d33');
+}
+function setTheme(p){ LS.set('theme', p); applyTheme(); refresh(); }
+try{ const mq = matchMedia('(prefers-color-scheme: dark)'); (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(applyTheme); }catch(e){}
+applyTheme();
+
+/* ---------- 关于与诊断 ---------- */
+let aboutInfo = { cache: '读取中…', storage: '', sw: '' };
+function errLog(){ try{ return JSON.parse(localStorage.getItem('wbErr') || '[]'); }catch(e){ return []; } }
+function openAbout(){
+  aboutInfo = { cache: '读取中…', storage: '', sw: '' };
+  navigate(renderAbout, '关于与诊断', '');
+  const set = (k, v) => { aboutInfo[k] = v; if(stack[stack.length - 1].render === renderAbout) refresh(); };
+  try{ caches.keys().then(ks => set('cache', ks.filter(k => /^wuban-english/.test(k)).join(', ') || '无')).catch(() => set('cache', '无法读取')); }catch(e){ set('cache', '不支持'); }
+  try{ navigator.storage.estimate().then(e => set('storage', `${(e.usage / 1048576).toFixed(1)} MB / ${Math.round(e.quota / 1048576)} MB`)); }catch(e){}
+  try{ navigator.serviceWorker.getRegistration().then(r => set('sw', r ? (navigator.serviceWorker.controller ? '运行中' : '已注册，等待接管') : '未注册')); }catch(e){ set('sw', '不支持'); }
+}
+function diagText(){
+  const a = window.ACCESS || {}, err = errLog(), s = srsStats();
+  const lines = [
+    `五班英语角 v${APP_VERSION}（${APP_BUILD}）`,
+    `缓存版本：${aboutInfo.cache}`,
+    `内容密钥编号：${a.kid || '-'}　邀请码编号：${a.codeId || '-'}`,
+    `在线：${navigator.onLine ? '是' : '否'}　主屏幕模式：${isStandalone() ? '是' : '否'}　离线服务：${aboutInfo.sw || '-'}`,
+    `外观：${themePref()}（当前 ${themeEffective()}）`,
+    `存储：${aboutInfo.storage || '-'}`,
+    `屏幕：${screen.width}x${screen.height} @${window.devicePixelRatio || 1}　视口：${innerWidth}x${innerHeight}`,
+    `学习记录：单词 ${LS.get('studiedWords', []).length} · 短语 ${LS.get('studiedPhrases', []).length} · 复习计划 ${s.total}（到期 ${s.due}）· 收藏 ${favList().length}`,
+    `设备：${navigator.userAgent}`,
+    `最近错误（${err.length}）：`
+  ];
+  err.slice(-10).forEach(e => { const d = new Date(e.t); lines.push(`  ${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}  ${e.m}`); });
+  return lines.join('\n');
+}
+function renderAbout(){
+  const err = errLog(), a = window.ACCESS || {};
+  return `<div class="view">
+    <div class="card about-head">
+      <img src="icon.svg" alt="" class="about-logo">
+      <div><div style="font-size:17px;font-weight:800">五班英语角 · 空保英语</div><div style="font-size:12px;color:var(--muted);margin-top:4rem">版本 ${APP_VERSION} · ${APP_BUILD}</div></div>
+    </div>
+    <div class="card" style="margin-top:20rem">
+      <div class="about-row"><span>离线缓存</span><b>${esc(aboutInfo.cache)}</b></div>
+      <div class="about-row"><span>离线服务</span><b>${esc(aboutInfo.sw || '读取中…')}</b></div>
+      <div class="about-row"><span>本机存储</span><b>${esc(aboutInfo.storage || '-')}</b></div>
+      <div class="about-row"><span>邀请码编号</span><b>${esc(a.codeId || '-')}</b></div>
+      <div class="about-row"><span>网络</span><b>${navigator.onLine ? '在线' : '离线'}</b></div>
+      <div class="about-row"><span>运行方式</span><b>${isStandalone() ? '主屏幕应用' : '浏览器'}</b></div>
+    </div>
+    <div class="card" style="margin-top:20rem">
+      <div class="bk-title">遇到问题？</div>
+      <div class="bk-sub">点下面的按钮把诊断信息复制下来，发给管理员即可。信息里不含邀请码和学习内容。</div>
+      <div class="bk-row">
+        <button class="btn gold" onclick="diagCopy()">${icon('copy')} 复制诊断信息</button>
+        <button class="btn ghost" onclick="checkUpdate()">${icon('refresh')} 检查更新</button>
+      </div>
+      <div class="bk-sub" style="margin-top:20rem">错误记录：${err.length ? `${err.length} 条` + ` · <span style="color:var(--blue)" onclick="errClear()">清除</span>` : '没有'}</div>
+      ${err.slice(-5).reverse().map(e => `<div class="err-line">${esc(e.m)}</div>`).join('')}
+    </div>
+    <div class="card" style="margin-top:20rem;font-size:12px;color:var(--muted);line-height:1.8">
+      民航安保执勤英语学习应用：500+ 执勤词汇、情景闯关剧本、处置实战口语与空保英语专题。<br>离线可用 · 学习记录只保存在本机，可在「进度备份与恢复」里带走。
+    </div>
+    <div class="safe"></div></div>`;
+}
+async function diagCopy(){
+  const text = diagText(); let ok = false;
+  try{ await navigator.clipboard.writeText(text); ok = true; }catch(e){}
+  if(!ok){
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;left:-999px;top:0';
+    document.body.appendChild(ta); ta.select(); try{ ok = document.execCommand('copy'); }catch(e){} ta.remove();
+  }
+  toast(ok ? '诊断信息已复制' : '复制失败，请截图发给管理员');
+}
+function errClear(){ try{ localStorage.removeItem('wbErr'); }catch(e){} refresh(); }
+function checkUpdate(){
+  if(!navigator.serviceWorker){ toast('当前浏览器不支持离线更新'); return; }
+  navigator.serviceWorker.getRegistration().then(r => {
+    if(!r){ toast('离线服务尚未启用'); return; }
+    toast('正在检查更新…');
+    return r.update().then(() => setTimeout(() => toast(r.installing || r.waiting ? '发现新版本，稍后会提示刷新' : '已是最新版本'), 1200));
+  }).catch(() => toast('检查失败，请稍后再试'));
+}
+
+/* 没有朗读内容的页面不显示语速悬浮钮，免得挡住文字 */
+function noSpeedPage(r){ return r === renderBackup || r === renderAbout; }

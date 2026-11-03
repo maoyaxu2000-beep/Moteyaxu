@@ -8,6 +8,8 @@ function serve(port){
   return new Promise(ok => {
     const srv = http.createServer((req, res) => {
       let p = decodeURIComponent(req.url.split('?')[0]); if(p.endsWith('/')) p += 'index.html';
+      if(p === '/favicon.ico'){ res.writeHead(204); return res.end(); }
+      if(p === '/tests/icon.svg') p = '/icon.svg';          // 测试页在 tests/ 下，图标用相对路径时指回根目录
       const f = path.join(ROOT, p);
       if(!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()){ res.writeHead(404); return res.end('nf'); }
       res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-store' });

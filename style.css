@@ -143,7 +143,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* setting */
 .card{background:var(--card);border-radius:22rem;padding:24rem;box-shadow:var(--shadow-sm);}
 .setting-row{display:flex;align-items:center;gap:14rem;}
-.setting-row input{flex:1;border:1rem solid var(--line);border-radius:14rem;padding:16rem;font-size:14px;background:#f8fafc;}
+.setting-row input{flex:1;border:1rem solid var(--line);border-radius:14rem;padding:16rem;font-size:16px;background:#f8fafc;}
 .setting-save{background:var(--navy-900);color:#fff;border-radius:14rem;padding:16rem 26rem;font-size:13px;font-weight:600;}
 .links{display:flex;justify-content:center;gap:12rem;color:var(--muted);font-size:12px;margin-top:28rem;flex-wrap:wrap;}
 .links span{cursor:pointer;}
@@ -384,7 +384,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .chat-msg.me{background:var(--navy-900);color:#fff;align-self:flex-end;border-bottom-right-radius:6rem;}
 .chat-bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom));max-width:520px;margin:0 auto;
   display:flex;gap:12rem;padding:16rem 24rem;background:#fff;border-top:1rem solid var(--line);}
-.chat-bar input{flex:1;border:1rem solid var(--line);border-radius:40rem;padding:18rem 24rem;font-size:14px;background:#f8fafc;}
+.chat-bar input{flex:1;border:1rem solid var(--line);border-radius:40rem;padding:18rem 24rem;font-size:16px;background:#f8fafc;}
 .chat-bar button{background:var(--navy-900);color:#fff;border-radius:40rem;padding:0 30rem;font-size:14px;font-weight:600;}
 .chat-result{background:#f8fafc;border-radius:14rem;padding:14rem 18rem;margin-top:12rem;}
 .chat-result .li-en{font-size:14px;} .chat-result .li-cn{font-size:11px;}
@@ -971,3 +971,39 @@ body.sc-open{overflow:hidden;}
 body.sc-open .tabbar,body.sc-open .speed-widget-wrap,body.sc-open #wbMark{display:none!important;}
 @media (orientation:landscape){.sc-body{gap:12px;}.sc-bar{padding-top:6px;}}
 .sc-btn .pi svg{width:100%;height:100%;fill:currentColor;}
+
+/* --- 备份页 --- */
+.bk-title{font-size:15px;font-weight:750;color:var(--navy-900);}
+.bk-sub{font-size:12px;color:#5e6575;margin-top:8rem;line-height:1.7;}
+.bk-area{display:block;width:100%;box-sizing:border-box;height:190rem;margin-top:18rem;padding:16rem 18rem;border-radius:18rem;border:1rem solid var(--line);
+  background:rgba(255,255,255,.7);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:16px;line-height:1.4;color:var(--text);resize:none;word-break:break-all;outline:none;}
+.bk-area:focus{border-color:var(--accent);}
+.bk-row{display:flex;gap:14rem;margin-top:18rem;}
+.bk-row .btn{flex:1;padding:22rem 10rem;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8rem;}
+.bk-row .btn .icon{width:30rem;height:30rem;margin:0;stroke-width:2;}
+.bk-tip{font-size:11px;color:#5e6575;margin-top:16rem;line-height:1.7;}
+.bk-msg{font-size:12px;margin-top:16rem;line-height:1.7;font-weight:600;}
+.bk-msg.ok{color:var(--green);}
+.bk-msg.bad{color:var(--red);}
+/* 放开双指缩放后，输入框字号不小于 16px，否则 iPhone 点进去会自动放大页面 */
+input,textarea,select{font-size:max(16px,1em);}
+
+/* --- 我的页图标底色（用 class，深色模式才能整体换色） --- */
+.play.p-gold{background:#fff6e0;color:var(--gold-dark);}
+.play.p-red{background:#fee2e2;color:#b91c1c;}
+.play.p-orange{background:#fff3e8;color:#f97316;}
+.play.p-pink{background:#fdebf4;color:#ec4899;}
+.play.p-violet{background:#efeafe;color:#7c3aed;}
+.play.p-slate{background:#f1f5f9;color:var(--navy-800);}
+.play.p-blue{background:#eaf2ff;color:#2563eb;}
+.play.p-teal{background:#e6fbf6;color:#0d9488;}
+/* --- 关于页 --- */
+.about-head{display:flex;align-items:center;gap:22rem;}
+.about-logo{width:96rem;height:96rem;border-radius:24rem;}
+.about-row{display:flex;justify-content:space-between;gap:20rem;padding:14rem 0;font-size:13px;border-bottom:1rem solid var(--line);}
+.about-row:last-child{border-bottom:0;}
+.about-row span{color:var(--muted);}
+.about-row b{font-weight:650;text-align:right;word-break:break-all;}
+.err-line{font-size:11px;color:var(--red);background:var(--red-light);border-radius:12rem;padding:10rem 16rem;margin-top:10rem;word-break:break-all;line-height:1.5;}
+.setting-row span,.setting-save{white-space:nowrap;flex-shrink:0;}
+.setting-row>span:first-child{width:auto!important;min-width:132rem;}

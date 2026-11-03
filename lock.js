@@ -179,6 +179,10 @@
     if(document.getElementById('wbMark')) return;
     const w = document.createElement('div');
     w.id = 'wbMark'; w.textContent = '内部学习资料 · 请勿外传';
+    /* 平铺的斜向水印带上邀请码编号（公开的前 4 位，不是邀请码本身）：截图外传时能追溯到是哪个码 */
+    const id = (window.ACCESS && window.ACCESS.codeId) || '';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='230' height='150'><text x='115' y='80' text-anchor='middle' transform='rotate(-24 115 75)' font-size='13' font-family='PingFang SC,Microsoft YaHei,sans-serif' fill='#7a8aa8' fill-opacity='0.12'>内部学习资料 · ${id}</text></svg>`;
+    if(id) w.style.backgroundImage = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
     document.body.appendChild(w);
   }
 

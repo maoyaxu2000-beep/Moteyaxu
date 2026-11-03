@@ -233,7 +233,7 @@ function paint(keep){
   if(typeof markPlaying==='function') markPlaying();
   /* 语速悬浮钮只在可能有朗读的页面出现，首页和「我的」不需要 */
   const sw=document.querySelector('.speed-widget-wrap');
-  if(sw) sw.style.display = (!cur.sub && (curTab==='home'||curTab==='me')) ? 'none' : '';
+  if(sw) sw.style.display = ((!cur.sub && (curTab==='home'||curTab==='me')) || (typeof noSpeedPage==='function' && noSpeedPage(cur.render))) ? 'none' : '';
   window.scrollTo(0,y);
 }
 function buildTabbar(){
@@ -852,10 +852,11 @@ function sendChat(){
 /* 个人码显示剩余有效期；全员码显示长期有效 */
 function accessNote(){
   const a=window.ACCESS||{};
-  if(!a.ttl) return '内部学习平台 · 退出后学习记录不会丢失';
+  const id=a.codeId?`编号 ${a.codeId} · `:'';
+  if(!a.ttl) return id+'内部学习平台 · 退出后学习记录不会丢失';
   const left=Math.max(0,Math.ceil((a.expiresAt-Date.now())/86400000));
   const d=new Date(a.expiresAt);
-  return `个人邀请码 · 剩余 ${left} 天（${d.getMonth()+1}月${d.getDate()}日到期）`;
+  return `${id}个人邀请码 · 剩余 ${left} 天（${d.getMonth()+1}月${d.getDate()}日到期）`;
 }
 function renderMe(){
   const name=LS.get('displayName','');
@@ -890,15 +891,23 @@ function renderMe(){
         </div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8rem;line-height:1.6">词库音标按英式标注，选英音可与音标对应；执勤实际通话更接近美音，可按需切换。</div>
+      <div class="setting-row" style="margin-top:16rem">
+        <span style="font-size:13px;width:96rem">外观</span>
+        <div style="display:flex;gap:8rem;flex:1">
+          ${[['auto','跟随系统'],['light','浅色'],['dark','深色']].map(([k,t])=>`<button class="chip ${themePref()===k?'active':''}" onclick="setTheme('${k}')">${t}</button>`).join('')}
+        </div>
+      </div>
     </div>
-    <div class="list-item arrow-item" style="margin-top:20rem" onclick="switchTab('words')"><div class="play" style="background:#fff6e0;color:var(--gold-dark)">${icon('book')}</div><div class="li-main"><div class="li-en">闯关地图</div><div class="li-cn">继续学习进度</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openStoryList()"><div class="play" style="background:#fee2e2;color:#b91c1c">${icon('alert')}</div><div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">真实特情处置</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openReview()"><div class="play" style="background:#fff3e8;color:#f97316">${icon('star')}</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openQuiz()"><div class="play" style="background:#fdebf4;color:#ec4899">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="openChat()"><div class="play" style="background:#efeafe;color:#7c3aed">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
-    <div class="list-item arrow-item" onclick="accessLogout()"><div class="play" style="background:#f1f5f9;color:var(--navy-800)">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">${accessNote()}</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" style="margin-top:20rem" onclick="switchTab('words')"><div class="play p-gold">${icon('book')}</div><div class="li-main"><div class="li-en">闯关地图</div><div class="li-cn">继续学习进度</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openStoryList()"><div class="play p-red">${icon('alert')}</div><div class="li-main"><div class="li-en">情景闯关剧本</div><div class="li-cn">真实特情处置</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openReview()"><div class="play p-orange">${icon('star')}</div><div class="li-main"><div class="li-en">生词本</div><div class="li-cn">${wrong} 个待复习</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openFavs()"><div class="play p-violet">${icon('star')}</div><div class="li-main"><div class="li-en">我的收藏</div><div class="li-cn">${favList().length} 句 · 可放大给旅客看</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openQuiz()"><div class="play p-pink">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openChat()"><div class="play p-violet">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openBackup()"><div class="play p-blue">${icon('download')}</div><div class="li-main"><div class="li-en">进度备份与恢复</div><div class="li-cn">${lastBackupText()}</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="accessLogout()"><div class="play p-slate">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">${accessNote()}</div></div><span class="func-arrow">›</span></div>
     <div class="links">
-      <span onclick="resetCheckin()">重置打卡</span>·<span onclick="resetProgress()">重置闯关进度</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="aboutApp()">关于</span>
+      <span onclick="resetCheckin()">重置打卡</span>·<span onclick="resetProgress()">重置闯关进度</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="openAbout()">关于与诊断</span>
     </div>
     <div class="safe"></div>
   </div>`;
