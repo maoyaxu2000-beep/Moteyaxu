@@ -259,7 +259,7 @@ function dailyPick(){
 }
 function renderHome(){
   const st=calcStreak();
-  const name=LS.get('displayName','')||'同学';
+  const name=LS.get('displayName','')||'用户';
   const studied=LS.get('studiedWords',[]).length;
   const phraseTotal=allPhrases().length, phraseStudied=LS.get('studiedPhrases',[]).length;
   const xp = (typeof totalXP==='function') ? totalXP() : 0;
