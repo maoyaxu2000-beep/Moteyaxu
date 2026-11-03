@@ -802,3 +802,20 @@ body{padding-bottom:calc(190rem + env(safe-area-inset-bottom));}
   :root{--glass:rgba(255,255,255,.96);--glass-strong:#fff;}
   .tabbar,.topbar,.chat-bar{background:rgba(255,255,255,.98);}
 }
+
+/* ===== 首页「自由学习」入口 + 背短语闪卡 ===== */
+.free-row{display:grid;grid-template-columns:1fr 1fr;gap:18rem;}
+.free-card{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1rem solid var(--glass-line);
+  box-shadow:var(--glass-hi),var(--glass-shadow);border-radius:30rem;padding:28rem 26rem 26rem;transition:transform .15s;}
+.free-card:active{transform:scale(.97);}
+.free-ic{width:80rem;height:80rem;border-radius:26rem;display:flex;align-items:center;justify-content:center;font-size:36rem;
+  box-shadow:var(--glass-hi),0 4px 12px rgba(38,58,110,.08);}
+.free-ic .icon{stroke-width:1.8;}
+.free-name{font-size:18px;font-weight:750;margin-top:22rem;color:var(--navy-900);}
+.free-meta{font-size:12px;color:var(--muted);margin-top:4rem;}
+.free-bar{height:8rem;border-radius:8rem;background:rgba(17,29,51,.08);margin-top:18rem;overflow:hidden;}
+.free-bar>i{display:block;height:100%;border-radius:8rem;background:var(--accent);}
+.phrase-q{font-size:22px;font-weight:750;line-height:1.5;color:var(--navy-900);padding:6rem 4rem;}
+.phrase-a{font-size:20px;font-weight:700;line-height:1.5;color:var(--navy-900);margin-top:6rem;}
+.phrase-cn{font-size:15px;color:var(--muted);margin-top:14rem;line-height:1.6;}
+.flash-reveal .flash-play{margin-top:22rem;}

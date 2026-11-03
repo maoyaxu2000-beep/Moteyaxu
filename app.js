@@ -261,6 +261,7 @@ function renderHome(){
   const st=calcStreak();
   const name=LS.get('displayName','')||'同学';
   const studied=LS.get('studiedWords',[]).length;
+  const phraseTotal=allPhrases().length, phraseStudied=LS.get('studiedPhrases',[]).length;
   const xp = (typeof totalXP==='function') ? totalXP() : 0;
   const level = (typeof userLevel==='function') ? userLevel() : 1;
   const {w,p}=dailyPick();
@@ -288,6 +289,24 @@ function renderHome(){
         <div class="stat-item"><span class="stat-num">${xp}</span><span class="stat-label">经验值 XP</span></div>
         <div class="stat-dot"></div>
         <div class="stat-item"><span class="stat-num">${st.streak}</span><span class="stat-label">连续打卡</span></div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:34rem">
+      <div class="section-head"><div class="section-head-left"><span class="section-title">自由学习</span></div><span class="section-sub">不闯关，随时背</span></div>
+      <div class="free-row">
+        <div class="free-card" onclick="openFreeWords()">
+          <div class="free-ic t-green">${icon('book')}</div>
+          <div class="free-name">背单词</div>
+          <div class="free-meta">已学 ${studied} / ${WORDS.length}</div>
+          <div class="free-bar"><i style="width:${WORDS.length?Math.min(100,Math.round(studied/WORDS.length*100)):0}%"></i></div>
+        </div>
+        <div class="free-card" onclick="openFreePhrases()">
+          <div class="free-ic t-blue">${icon('talk')}</div>
+          <div class="free-name">背短语</div>
+          <div class="free-meta">已学 ${phraseStudied} / ${phraseTotal}</div>
+          <div class="free-bar"><i style="width:${phraseTotal?Math.min(100,Math.round(phraseStudied/phraseTotal*100)):0}%"></i></div>
+        </div>
       </div>
     </div>
 
@@ -447,6 +466,103 @@ function markKnownNext(){ const w=wordSession.list[wordSession.idx]; const set=n
 function addWrong(){ const w=wordSession.list[wordSession.idx]; const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===w.word)){ arr.push(w); LS.set('wrongWords',arr); toast('已加入生词本'); } else toast('已在生词本中'); }
 function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); } else refresh(); }
 function finishWords(){ toast('本组学习完成'); goBack(); }
+
+/* =========================================================
+   自由学习 · 背短语（SPEAKING 里的口语短句，闪卡 + 生词本式复习）
+   进度记在本机：studiedPhrases（会了）、wrongPhrases（待复习），以英文原句为 key
+========================================================= */
+function allPhrases(){ const r=[]; SPEAKING.forEach(c=>c.list.forEach(it=>r.push({en:it.en,cn:it.cn,cat:c.category}))); return r; }
+let phraseSession=null;
+function phraseDir(){ return LS.get('phraseDir','cn2en'); }
+function openFreeWords(){ navigate(renderWordsMenu,'背单词',''); }
+function openFreePhrases(){ navigate(renderPhraseMenu,'背短语',''); }
+function setPhraseDir(d){ LS.set('phraseDir',d); refresh(); }
+function renderPhraseMenu(){
+  const all=allPhrases(), studied=LS.get('studiedPhrases',[]).length, wrong=LS.get('wrongPhrases',[]).length, dir=phraseDir();
+  let cats='';
+  SPEAKING.forEach((c,i)=>{ cats+=`<div class="list-item arrow-item" onclick="startPhrases(${i})"><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
+  return `<div class="view">
+    <div class="daily-list" style="grid-template-columns:1fr 1fr;">
+      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学短语</div></div>
+      <div class="card" style="text-align:center" onclick="openPhraseReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">待复习 ›</div></div>
+    </div>
+    <div class="seg" style="margin-top:20rem"><button class="${dir==='cn2en'?'active':''}" onclick="setPhraseDir('cn2en')">看中文 · 想英文</button><button class="${dir==='en2cn'?'active':''}" onclick="setPhraseDir('en2cn')">听英文 · 想中文</button></div>
+    <button class="btn gold" onclick="startPhrases(-1)">全部随机 · ${all.length} 句</button>
+    <div class="section-head" style="margin-top:30rem"><div class="section-head-left"><span class="section-title">按场景背</span></div><span class="section-sub">共 ${SPEAKING.length} 个场景</span></div>
+    ${cats}
+    <div class="safe"></div>
+  </div>`;
+}
+function startPhrases(ci){
+  const src = ci<0 ? allPhrases() : SPEAKING[ci].list.map(it=>({en:it.en,cn:it.cn,cat:SPEAKING[ci].category}));
+  if(!src.length){ toast('该场景暂无短语'); return; }
+  phraseSession={list:shuffle(src),idx:0,revealed:false,mode:'study',cat:ci<0?'全部短语':SPEAKING[ci].category};
+  navigate(renderPhraseFlash, phraseSession.cat, '');
+  if(phraseDir()==='en2cn') setTimeout(()=>speak(phraseSession.list[0].en),0);
+}
+function openPhraseReview(){
+  const keys=new Set(LS.get('wrongPhrases',[]));
+  const list=allPhrases().filter(p=>keys.has(p.en));
+  if(!list.length){ toast('还没有待复习的短语'); return; }
+  phraseSession={list,idx:0,revealed:false,mode:'review',cat:'待复习短语'};
+  navigate(renderPhraseFlash,'待复习短语 ('+list.length+')','');
+  if(phraseDir()==='en2cn') setTimeout(()=>speak(list[0].en),0);
+}
+function renderPhraseFlash(){
+  const s=phraseSession; if(!s||!s.list.length) return `<div class="view"><div class="empty"><span class="big">${icon('talk')}</span>暂无短语</div></div>`;
+  const p=s.list[s.idx], pct=Math.round((s.idx+1)/s.list.length*100), dir=phraseDir(), review=s.mode==='review';
+  let face;
+  if(dir==='cn2en'){
+    face = `<div class="flash-tags"><span class="flash-cat" style="margin-bottom:0">${esc(p.cat)}</span></div>
+      <div class="phrase-q">${esc(p.cn)}</div>
+      ${ s.revealed
+        ? `<div class="flash-reveal"><div class="phrase-a speakable" onclick="event.stopPropagation();speak(${jsAttr(p.en)})">${esc(p.en)}</div><div class="flash-play" ${pb(p.en)}>${PI}</div></div>`
+        : `<div class="tap-hint">先想想英文怎么说，点击卡片看答案</div>` }`;
+  } else {
+    face = `<div class="flash-tags"><span class="flash-cat" style="margin-bottom:0">${esc(p.cat)}</span></div>
+      <div class="flash-play" ${pb(p.en)}>${PI}</div>
+      ${ s.revealed
+        ? `<div class="flash-reveal"><div class="phrase-a speakable" onclick="event.stopPropagation();speak(${jsAttr(p.en)})">${esc(p.en)}</div><div class="phrase-cn">${esc(p.cn)}</div></div>`
+        : `<div class="tap-hint">听一遍，想想是什么意思，点击卡片看答案</div>` }`;
+  }
+  return `<div class="view">
+    <div class="progress-txt"><span>${s.idx+1} / ${s.list.length}</span><span>${esc(s.cat)}</span></div>
+    <div class="progress-bar"><i style="width:${pct}%"></i></div>
+    <div class="flash" onclick="revealPhrase()">${face}</div>
+    <div class="flash-actions">
+      ${review
+        ? `<button class="btn ghost" onclick="removeWrongPhrase()">已掌握 · 移除</button><button class="btn gold" onclick="nextPhrase()">下一个 ›</button>`
+        : `<button class="btn amber" onclick="addWrongPhrase()">${icon('star')} 还不熟</button><button class="btn gold" onclick="markPhraseKnown()">会了 · 下一个</button>`}
+    </div>
+    <div class="safe"></div>
+  </div>`;
+}
+function revealPhrase(){
+  const s=phraseSession; s.revealed=!s.revealed; refresh();
+  if(s.revealed && phraseDir()==='cn2en') speak(s.list[s.idx].en);
+}
+function nextPhrase(){
+  const s=phraseSession;
+  if(s.idx<s.list.length-1){ s.idx++; s.revealed=false; refresh(); if(phraseDir()==='en2cn') setTimeout(()=>speak(s.list[s.idx].en),0); }
+  else { toast('本组短语学习完成'); goBack(); }
+}
+function markPhraseKnown(){
+  const p=phraseSession.list[phraseSession.idx];
+  const set=new Set(LS.get('studiedPhrases',[])); set.add(p.en); LS.set('studiedPhrases',[...set]);
+  const w=LS.get('wrongPhrases',[]).filter(x=>x!==p.en); LS.set('wrongPhrases',w);
+  nextPhrase();
+}
+function addWrongPhrase(){
+  const p=phraseSession.list[phraseSession.idx]; const arr=LS.get('wrongPhrases',[]);
+  if(!arr.includes(p.en)){ arr.push(p.en); LS.set('wrongPhrases',arr); toast('已加入待复习'); } else toast('已在待复习中');
+}
+function removeWrongPhrase(){
+  const s=phraseSession, p=s.list[s.idx];
+  LS.set('wrongPhrases',LS.get('wrongPhrases',[]).filter(x=>x!==p.en));
+  const set=new Set(LS.get('studiedPhrases',[])); set.add(p.en); LS.set('studiedPhrases',[...set]);
+  s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false;
+  toast('已移除'); if(!s.list.length) goBack(); else refresh();
+}
 
 /* =========================================================
    SPEAKING (口语短句)
