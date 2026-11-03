@@ -67,12 +67,6 @@ function srsSeedOnce(){
   srsSave(m);
 }
 
-function srsDueKeys(m){
-  m = m || srsAll(); const td = todayStr(), out = [];
-  for(const k in m){ if(m[k].d <= td) out.push(k); }
-  out.sort((a, b) => (m[a].d < m[b].d ? -1 : m[a].d > m[b].d ? 1 : m[a].b - m[b].b));
-  return out;
-}
 /* 条目内容在词库里查不到（词库更新删掉了）就丢弃 */
 let _wordMap = null, _phraseMap = null;
 function srsResolve(k){
@@ -90,6 +84,25 @@ function srsResolve(k){
     return l ? { type, id, p: { en: l.en, cn: l.cn, cat: l.scene.title } } : null;
   }
   return null;
+}
+/* 确定「已经不存在」才算失效。处置口语库是最后加载的（首页第一次绘制时还没有），没加载时一律当作还在 */
+function srsGone(k){
+  const t = k[0];
+  if(t === 'l') return typeof DRILL_LINES !== 'undefined' && !DRILL_LINES[k.slice(2)];
+  if(t === 'w' || t === 'p') return !srsResolve(k);
+  return true;
+}
+/* 到期的条目 key（已失效的顺手清掉，免得首页数字和实际能复习的对不上） */
+function srsDueKeys(m){
+  m = m || srsAll(); const td = todayStr(), out = []; let pruned = false;
+  for(const k in m){
+    if(m[k].d > td) continue;
+    if(srsGone(k)){ delete m[k]; pruned = true; continue; }
+    out.push(k);
+  }
+  if(pruned) srsSave(m);
+  out.sort((a, b) => (m[a].d < m[b].d ? -1 : m[a].d > m[b].d ? 1 : m[a].b - m[b].b));
+  return out;
 }
 function srsStats(){
   const m = srsAll(), due = srsDueKeys(m), by = { w: 0, p: 0, l: 0 };
@@ -165,7 +178,7 @@ function renderSrs(){
       ${s.revealed ? `<div class="flash-reveal"><div class="phrase-a speakable" onclick="event.stopPropagation();speak(${jsAttr(p.en)})">${esc(p.en)}</div><div class="phrase-cn">${esc(p.cn)}</div></div>`
         : `<div class="tap-hint">听一遍，想想是什么意思，再点「显示答案」</div>`}`;
   }
-  const extra = (s.revealed && it.type !== 'w' && typeof lineTools === 'function') ? lineTools(it.p.en, it.p.cn, true) : '';
+  const extra = (s.revealed && it.type !== 'w' && typeof lineTools === 'function') ? lineTools(it.p.en, it.p.cn) : '';
   return `<div class="view">
     <div class="progress-txt"><span>${s.idx + 1} / ${s.list.length}</span><span>${SRS_LABEL[it.type]}复习</span></div>
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
@@ -313,7 +326,11 @@ function showCard(en, cn){
   document.body.appendChild(d);
   document.body.classList.add('sc-open');
   markPlaying();
-  try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { _wake = l; }).catch(() => {}); }catch(e){}
+  try{
+    if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l => {
+      if(document.getElementById('showCard')) _wake = l; else l.release().catch(() => {});   // 请求期间卡片已关闭：立刻还回去
+    }).catch(() => {});
+  }catch(e){}
 }
 function scToggleCn(btn){
   const cn = document.getElementById('scCn'); if(!cn) return;
@@ -504,6 +521,7 @@ function mergeBackup(b){
   { const cur = LS.get('lessonProgress', {}), inc = d.lp && typeof d.lp === 'object' ? d.lp : {}; sum.lessons = 0;
     Object.keys(inc).forEach(id => { const v = inc[id]; if(!v || typeof v !== 'object') return;
       const a = cur[id], ns = num(v.stars), nx = num(v.xp);
+      if(ns <= 0) return;
       if(!a || ns > a.stars || (ns === a.stars && nx > (a.xp || 0))){ if(!a) sum.lessons++; cur[id] = { stars: ns, xp: nx }; } });
     LS.set('lessonProgress', cur); }
   { const cur = LS.get('storyProgress', {}), inc = d.st && typeof d.st === 'object' ? d.st : {};
@@ -767,9 +785,12 @@ function recDiscard(){
   rec = { state: 'idle', key: null, url: null, mr: null, chunks: [], timer: null };
 }
 function recStopPlay(){ if(recAudio){ const a = recAudio; recAudio = null; try{ a.pause(); a.removeAttribute('src'); a.load(); }catch(e){} } }   // 先释放媒体资源，再撤销地址，否则浏览器会报「文件不存在」
+let recStarting = false;
 async function recStart(el){
+  if(recStarting) return;                       // 正在等麦克风授权时再点没有意义，还会留下关不掉的麦克风
   const en = el.dataset.en, key = audioKey(en);
   recDiscard(); stopSpeak();
+  recStarting = true;
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
@@ -785,8 +806,10 @@ async function recStart(el){
       refresh();
     };
     mr.start();
+    recStarting = false;
     refresh();
   }catch(e){
+    recStarting = false;
     rec = { state: 'idle', key: null, url: null, mr: null, chunks: [], timer: null };
     toast(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? '没有麦克风权限：请在浏览器/系统设置里允许使用麦克风' : '这台设备暂时无法录音');
   }

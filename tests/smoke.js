@@ -55,6 +55,10 @@ const { serve, launch, check, done } = require('./lib');
   check('经验值增加', await ev(() => totalXP()) >= 2);
   await ev(() => srsExit());
   check('回首页显示完成状态', await page.locator('.srs-card.done').count() === 1);
+  /* 词库里已不存在的条目：不计入到期数，并被清掉 */
+  await ev(() => { const m = srsAll(); m['w:不存在的词'] = { b: 0, d: todayStr(), t: 1 }; m['p:not a phrase'] = { b: 0, d: todayStr(), t: 1 }; srsSave(m); });
+  check('失效条目不计入到期数', await ev(() => srsStats().due) === 0);
+  check('失效条目被清理', await ev(() => !('w:不存在的词' in srsAll()) && !('p:not a phrase' in srsAll())));
 
   console.log('· 收藏');
   await ev(() => openSpeakCat(0));
