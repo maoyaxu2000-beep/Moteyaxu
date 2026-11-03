@@ -823,3 +823,18 @@ body{padding-bottom:calc(190rem + env(safe-area-inset-bottom));}
 .free-more{position:absolute;top:22rem;right:22rem;font-size:11px;font-weight:650;color:var(--navy-800);padding:8rem 18rem;border-radius:999px;
   background:rgba(255,255,255,.75);border:1rem solid var(--glass-line);box-shadow:var(--glass-hi);}
 .free-more:active{opacity:.6;}
+
+/* ===== 首页问候卡：紧凑版（占比更小） ===== */
+.welcome-card{padding:24rem 28rem 22rem;border-radius:28rem;}
+.welcome-card::after{width:220rem;height:220rem;top:-80rem;right:-60rem;}
+.welcome-avatar{width:68rem;height:68rem;font-size:26rem;}
+.welcome-user{gap:16rem;}
+.welcome-greeting{font-size:15px;}
+.welcome-status{font-size:11px;margin-top:3rem;gap:6rem;}
+.status-dot{width:10rem;height:10rem;}
+.date-day{font-size:22px;}
+.date-week{font-size:10px;}
+.welcome-stats{margin-top:18rem;padding:16rem 0 0;}
+.stat-num{font-size:20px;}
+.stat-label{font-size:10px;}
+.stat-dot{height:34rem;}
