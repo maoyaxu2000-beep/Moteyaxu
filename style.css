@@ -1018,3 +1018,134 @@ input,textarea,select{font-size:max(16px,1em);}
 .poster-img{border-radius:22px;overflow:hidden;background:#142039;aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;box-shadow:0 18px 50px rgba(0,0,0,.45);}
 .poster-img img{display:block;width:100%;height:100%;-webkit-touch-callout:default;}
 .poster-tip{color:rgba(255,255,255,.75);font-size:12px;text-align:center;margin-top:12px;}
+
+/* ===========================================================
+   深色模式（html[data-theme="dark"]）
+   浅色样式分四层叠出来，这里放在最后、用更高的选择器优先级统一改成深色。
+=========================================================== */
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0a1020; --card:#16213a; --text:#e8edf7; --muted:#9aa5bb; --line:rgba(255,255,255,.10);
+  --accent-soft:rgba(240,168,46,.16); --red-light:rgba(217,74,63,.18); --gold-dark:#f0b350;
+  --glass:rgba(28,40,68,.66); --glass-strong:rgba(30,44,76,.90); --glass-line:rgba(255,255,255,.10);
+  --glass-shadow:0 10px 30px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.25);
+  --glass-hi:inset 0 1px 0 rgba(255,255,255,.10),inset 0 -1px 0 rgba(255,255,255,.03);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow-md:0 8px 24px rgba(0,0,0,.4);
+  --green:#46c48a; --green-d:#7fe0b3; --blue:#7ea3ff; --red:#ef6f64;
+}
+:root[data-theme="dark"] html,html[data-theme="dark"]{background:#0a1020;}
+html[data-theme="dark"] body{color:var(--text);}
+html[data-theme="dark"] body::before{background:
+    radial-gradient(55% 38% at 8% 2%,rgba(60,100,200,.38),transparent 72%),
+    radial-gradient(48% 34% at 100% 16%,rgba(200,120,50,.20),transparent 72%),
+    radial-gradient(58% 42% at 0% 62%,rgba(40,140,130,.22),transparent 72%),
+    radial-gradient(52% 40% at 100% 92%,rgba(110,80,200,.26),transparent 72%),#0a1020;}
+html[data-theme="dark"] body::after{background:linear-gradient(to top,rgba(10,16,32,.96) 0%,rgba(10,16,32,.75) 45%,rgba(10,16,32,0) 100%);}
+/* 玻璃卡片 */
+html[data-theme="dark"] :is(.quick-item,.func-card,.checkin-card,.card,.flash,.ex-card,.quiz-q,.story-brief,.drill-howto>div,.sec-cat,.qa-item,.story-list-card,.drill-scene-card,.free-card,.daily-card,.chat-msg.bot,.bubble.left,.story-list-card.soft,.srs-card){
+  background:var(--glass);border-color:var(--glass-line);box-shadow:var(--glass-hi),var(--glass-shadow);color:var(--text);}
+html[data-theme="dark"] :is(.list-item,.ex-opt,.quiz-opt,.story-choice,.ex-chip,.ex-match-item,.chip,.lt-btn,.search-pill,.free-more){
+  background:rgba(32,46,78,.62);border-color:var(--glass-line);box-shadow:var(--glass-hi);color:var(--text);}
+html[data-theme="dark"] .word-card{background:linear-gradient(160deg,rgba(32,46,78,.7),rgba(30,90,70,.45));}
+html[data-theme="dark"] .phrase-card{background:linear-gradient(160deg,rgba(32,46,78,.7),rgba(60,90,170,.40));}
+html[data-theme="dark"] .daily-card-tag{background:rgba(255,255,255,.08);color:var(--muted);}
+html[data-theme="dark"] .srs-card{background:linear-gradient(150deg,rgba(32,46,78,.8),rgba(40,64,120,.6));}
+html[data-theme="dark"] .srs-card.done{background:rgba(30,90,70,.45);}
+/* 顶栏 / 底栏 */
+html[data-theme="dark"] .topbar{background:rgba(12,20,40,.78);border-bottom-color:rgba(255,255,255,.08);box-shadow:none;color:var(--text);}
+html[data-theme="dark"] .topbar .back{background:rgba(255,255,255,.10);color:var(--text);}
+html[data-theme="dark"] .topbar .act{color:var(--text);}
+html[data-theme="dark"] .tabbar{background:rgba(16,26,50,.86);border-color:rgba(255,255,255,.10);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);}
+html[data-theme="dark"] .tab{color:#8c97ae;}
+html[data-theme="dark"] .tab.active{background:rgba(255,255,255,.12);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14);}
+/* 文字：原来用墨蓝当字色的地方改成浅色（墨蓝本身还作为按钮底色，不能直接改变量） */
+html[data-theme="dark"] :is(.free-name,.phrase-q,.phrase-a,.srs-title,.bk-title,.daily-card-word,.daily-card-en,.result-score,.result-stat b,.drill-howto b,.drill-head-en,.drill-q-cn,.drill-a-cn,.drill-a-en,.week-day.today .week-label,.modal-title,.speed-panel-head,.section-title,.li-en,.func-name,.quick-name,.flash-word,.flash-meaning,.qw,.ex-word,.ex-q,.story-choice .en,.sec-cat .nm,.chat-msg,.bubble .speakable,.map-unit-title,.stat-num-dark){color:var(--text);}
+html[data-theme="dark"] :is(.muted,.li-cn,.func-desc,.srs-sub,.sr-title,.sr-tip,.sr-eg,.bk-sub,.bk-tip,.fav-head,.flash-eg,.flash-eg-cn,.phrase-cn,.section-sub,.search-pill,.quick-desc,.cn){color:var(--muted);}
+html[data-theme="dark"] :is(.tap-hint,.func-arrow,.arrow-item .func-arrow,.sb-clear,.ln-btn,.role-tag,.li-title,.sr-src,.empty .big){color:#6e7a93;}
+html[data-theme="dark"] .ln-btn.fav.on{color:#f0a82e;}
+html[data-theme="dark"] .lt-btn.fav.on{color:#ffcf7a;background:rgba(240,168,46,.18);}
+html[data-theme="dark"] .search-pill .icon,html[data-theme="dark"] .search-bar>.icon{color:#aab6d0;}
+html[data-theme="dark"] .func-divider{background:rgba(255,255,255,.07);}
+html[data-theme="dark"] .func-badge{background:rgba(240,168,46,.18);color:#ffcf7a;}
+/* 图标底色 */
+html[data-theme="dark"] .quick-icon,html[data-theme="dark"] .func-icon,html[data-theme="dark"] .story-list-icon{background:rgba(255,255,255,.08);color:#c9d3e8;}
+html[data-theme="dark"] .t-green{background:rgba(52,178,123,.18)!important;color:#6fe0ac!important;}
+html[data-theme="dark"] .t-red{background:rgba(217,74,63,.20)!important;color:#ff9087!important;}
+html[data-theme="dark"] .t-blue{background:rgba(91,141,239,.20)!important;color:#9cb9ff!important;}
+html[data-theme="dark"] .t-pink{background:rgba(236,72,153,.18)!important;color:#ff9cc6!important;}
+html[data-theme="dark"] .t-navy{background:rgba(255,255,255,.10)!important;color:#c9d3e8!important;}
+html[data-theme="dark"] .t-violet{background:rgba(124,92,230,.22)!important;color:#c0adff!important;}
+html[data-theme="dark"] .t-teal{background:rgba(18,160,148,.20)!important;color:#6fe3d6!important;}
+html[data-theme="dark"] .story-list-icon.drill-ic-ground{background:rgba(91,141,239,.20);color:#9cb9ff;}
+html[data-theme="dark"] .story-list-icon.drill-ic-order{background:rgba(52,178,123,.18);color:#6fe0ac;}
+html[data-theme="dark"] .story-list-icon.drill-ic-violation{background:rgba(240,168,46,.18);color:#ffcf7a;}
+html[data-theme="dark"] .story-list-icon.drill-ic-conflict{background:rgba(217,74,63,.20);color:#ff9087;}
+html[data-theme="dark"] .story-list-icon.drill-ic-control{background:rgba(124,92,230,.22);color:#c0adff;}
+html[data-theme="dark"] .story-list-icon.drill-ic-report{background:rgba(255,255,255,.10);color:#c9d3e8;}
+html[data-theme="dark"] .play.p-gold{background:rgba(240,168,46,.18);color:#ffcf7a;}
+html[data-theme="dark"] .play.p-red{background:rgba(217,74,63,.20);color:#ff9087;}
+html[data-theme="dark"] .play.p-orange{background:rgba(249,115,22,.20);color:#ffab72;}
+html[data-theme="dark"] .play.p-pink{background:rgba(236,72,153,.18);color:#ff9cc6;}
+html[data-theme="dark"] .play.p-violet{background:rgba(124,92,230,.22);color:#c0adff;}
+html[data-theme="dark"] .play.p-slate{background:rgba(255,255,255,.10);color:#c9d3e8;}
+html[data-theme="dark"] .play.p-blue{background:rgba(91,141,239,.20);color:#9cb9ff;}
+html[data-theme="dark"] .play.p-teal{background:rgba(18,160,148,.20);color:#6fe3d6;}
+html[data-theme="dark"] .play:not([data-pk]):not([class*=" p-"]){background:rgba(255,255,255,.10);color:#c9d3e8;}
+html[data-theme="dark"] :is(.flash-cat,.drill-no){background:rgba(255,255,255,.10);color:#c9d3e8;}
+html[data-theme="dark"] .usage-tag.radio{background:rgba(91,141,239,.2);color:#9cb9ff;}
+html[data-theme="dark"] .usage-tag.face{background:rgba(52,178,123,.2);color:#6fe0ac;}
+html[data-theme="dark"] .usage-tag.write{background:rgba(160,100,230,.22);color:#d3a8ff;}
+html[data-theme="dark"] .usage-tag.life{background:rgba(240,168,46,.2);color:#ffcf7a;}
+/* 按钮 */
+html[data-theme="dark"] .btn.ghost,html[data-theme="dark"] .seg{background:rgba(32,46,78,.62);color:var(--text);border-color:var(--glass-line);box-shadow:var(--glass-hi);}
+html[data-theme="dark"] .seg button{color:var(--muted);}
+html[data-theme="dark"] .seg button.active{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;}
+html[data-theme="dark"] .btn.done{background:rgba(52,178,123,.20);color:#7fe0b3;box-shadow:var(--glass-hi);}
+html[data-theme="dark"] .btn.amber{background:rgba(240,168,46,.18);color:#ffcf7a;box-shadow:var(--glass-hi);}
+html[data-theme="dark"] .chip.active{background:linear-gradient(180deg,#3a5694,#25365e);color:#fff;border-color:transparent;}
+/* 输入框 */
+html[data-theme="dark"] :is(.setting-row input,.chat-bar input,.ex-input,.bk-area,.search-bar){background:rgba(10,16,32,.55);border-color:var(--glass-line);color:var(--text);box-shadow:none;}
+html[data-theme="dark"] .search-bar{background:rgba(24,36,64,.92);}
+html[data-theme="dark"] .search-bar input{background:transparent;color:var(--text);}
+html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#6e7a93;}
+html[data-theme="dark"] .chat-bar{background:rgba(12,20,40,.94);border-color:rgba(255,255,255,.08);}
+html[data-theme="dark"] .ex-input.correct{background:rgba(52,178,123,.18);color:#7fe0b3;}
+html[data-theme="dark"] .ex-input.wrong{background:var(--red-light);color:#ff9087;}
+/* 答题反馈 / 选项状态 */
+html[data-theme="dark"] :is(.ex-opt.correct,.quiz-opt.correct,.story-choice.correct){background:rgba(52,178,123,.22);border-color:#34b27b;}
+html[data-theme="dark"] :is(.ex-opt.wrong,.quiz-opt.wrong,.story-choice.wrong){background:rgba(217,74,63,.22);border-color:#d94a3f;}
+html[data-theme="dark"] .ex-feedback.good{background:rgba(52,178,123,.18);color:#7fe0b3;}
+html[data-theme="dark"] .ex-feedback.bad{background:var(--red-light);color:#ff9087;}
+html[data-theme="dark"] .story-narration{background:rgba(240,168,46,.12);border-color:rgba(240,168,46,.3);color:#f2d9a3;}
+/* 闯关地图 */
+html[data-theme="dark"] .map-node.locked{background:rgba(255,255,255,.08);color:#6e7a93;border-color:rgba(255,255,255,.12);box-shadow:none;}
+html[data-theme="dark"] .map-node{border-color:#16213a;}
+html[data-theme="dark"] .map-unit-head.locked{background:rgba(90,100,125,.5);}
+html[data-theme="dark"] .heart.lost{color:#3a465f;}
+/* 弹层 / 悬浮 */
+html[data-theme="dark"] .modal-card,html[data-theme="dark"] .speed-panel{background:var(--glass-strong);border:1rem solid var(--glass-line);color:var(--text);}
+html[data-theme="dark"] .modal-mask{background:rgba(0,0,0,.55);}
+html[data-theme="dark"] .modal-step-ic{background:rgba(240,168,46,.18);}
+html[data-theme="dark"] .modal-step-txt b{color:var(--text);}
+html[data-theme="dark"] .install-banner{background:linear-gradient(135deg,#1d2f57,#142039);}
+html[data-theme="dark"] .toast{background:rgba(40,56,92,.95);}
+html[data-theme="dark"] .speed-fab{background:rgba(40,56,92,.95);}
+/* 其它 */
+html[data-theme="dark"] .week-day .week-dot{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);}
+html[data-theme="dark"] .free-bar,html[data-theme="dark"] .drill-prog,html[data-theme="dark"] .progress-bar{background:rgba(255,255,255,.10);}
+html[data-theme="dark"] .about-row{border-color:var(--line);}
+html[data-theme="dark"] .err-line{color:#ff9087;}
+html[data-theme="dark"] .sr-item mark{background:rgba(240,168,46,.35);}
+html[data-theme="dark"] .links span{color:var(--muted);}
+html[data-theme="dark"] .result-ring .inner{background:var(--card);}
+html[data-theme="dark"] .drill-brief{background:rgba(255,255,255,.06);color:var(--text);}
+html[data-theme="dark"] .continue-card{box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),0 12px 28px rgba(0,0,0,.4);}
+html[data-theme="dark"] .gate-card{color:#fff;}
+html[data-theme="dark"] #wbMark{opacity:.9;}
+html[data-theme="dark"] .ex-tokens{background:rgba(10,16,32,.55);}
+html[data-theme="dark"] .bubble.right{background:rgba(70,108,200,.30);color:var(--text);}
+html[data-theme="dark"] .bubble.right .role-tag{color:#aab6d0;}
+html[data-theme="dark"] .ex-token{background:#3a5694;}
+html[data-theme="dark"] :is(.ex-opt,.quiz-opt,.story-choice) .idx{background:rgba(255,255,255,.12);color:var(--text);}
+html[data-theme="dark"] .ex-opt.correct .idx,html[data-theme="dark"] .quiz-opt.correct .idx{background:var(--green2);color:#fff;}
+html[data-theme="dark"] .ex-opt.wrong .idx,html[data-theme="dark"] .quiz-opt.wrong .idx{background:#ef6f64;color:#fff;}

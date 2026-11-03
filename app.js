@@ -432,7 +432,7 @@ function renderWordsMenu(){
     chips+=`<div class="list-item arrow-item" onclick="startWords('${esc(c)}')"><div class="li-main"><div class="li-en">${esc(c)}</div><div class="li-cn">${cnt} 个词</div></div><span class="func-arrow">›</span></div>`; });
   return `<div class="view">
     <div class="daily-list" style="grid-template-columns:1fr 1fr;">
-      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学单词</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--text)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学单词</div></div>
       <div class="card" style="text-align:center" onclick="openReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">生词本 ›</div></div>
     </div>
     <button class="btn gold" style="margin-top:20rem;" onclick="openQuiz()">开始单词测试</button>
@@ -539,7 +539,7 @@ function renderPhraseMenu(){
   SPEAKING.forEach((c,i)=>{ cats+=`<div class="list-item arrow-item" onclick="startPhrases(${i})"><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
   return `<div class="view">
     <div class="daily-list" style="grid-template-columns:1fr 1fr;">
-      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学短语</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:26px;font-weight:800;color:var(--text)">${studied}</div><div style="font-size:12px;color:var(--muted)">已学短语</div></div>
       <div class="card" style="text-align:center" onclick="openPhraseReview()"><div style="font-size:26px;font-weight:800;color:#f97316">${wrong}</div><div style="font-size:12px;color:var(--muted)">待复习 ›</div></div>
     </div>
     <div class="seg" style="margin-top:20rem"><button class="${dir==='cn2en'?'active':''}" onclick="setPhraseDir('cn2en')">看中文 · 想英文</button><button class="${dir==='en2cn'?'active':''}" onclick="setPhraseDir('en2cn')">听英文 · 想中文</button></div>
@@ -629,7 +629,7 @@ function removeWrongPhrase(){
 ========================================================= */
 function renderSpeaking(){
   let html=`<div class="view"><div class="section-head"><div class="section-head-left"><div class="section-head-bar"></div><span class="section-title">情景口语</span></div><span class="section-sub">${SPEAKING.length} 个场景</span></div>`;
-  SPEAKING.forEach((c,i)=>{ html+=`<div class="list-item arrow-item" onclick="openSpeakCat(${i})"><div class="play" style="background:#eaf2ff;color:#2563eb">${icon('talk')}</div><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
+  SPEAKING.forEach((c,i)=>{ html+=`<div class="list-item arrow-item" onclick="openSpeakCat(${i})"><div class="play p-blue">${icon('talk')}</div><div class="li-main"><div class="li-en">${esc(c.category)}</div><div class="li-cn">${c.list.length} 句</div></div><span class="func-arrow">›</span></div>`; });
   return html+'<div class="safe"></div></div>';
 }
 function openSpeakCat(i){
@@ -650,7 +650,7 @@ function openDialogue(){ navigate(renderDialogueMenu,'情景对话',''); }
 function renderDialogueMenu(){
   let html=`<div class="view">`;
   DIALOGUES.forEach((c,i)=>{ html+=`<div class="part-title">${esc(c.category)}</div>`;
-    c.list.forEach((d,j)=>{ html+=`<div class="list-item arrow-item" onclick="openDialogueItem(${i},${j})"><div class="play" style="background:#e6fbf6;color:#0d9488">${icon('drama')}</div><div class="li-main"><div class="li-en">${esc(d.title)}</div><div class="li-cn">${d.dialogue.length} 句对话</div></div><span class="func-arrow">›</span></div>`; });
+    c.list.forEach((d,j)=>{ html+=`<div class="list-item arrow-item" onclick="openDialogueItem(${i},${j})"><div class="play p-teal">${icon('drama')}</div><div class="li-main"><div class="li-en">${esc(d.title)}</div><div class="li-cn">${d.dialogue.length} 句对话</div></div><span class="func-arrow">›</span></div>`; });
   });
   return html+'<div class="safe"></div></div>';
 }
@@ -880,7 +880,7 @@ function renderMe(){
       ${isStandalone()? '' : `<button class="btn gold" onclick="installApp()">安装到主屏幕，随时离线打开</button>`}
     </div>
     <div class="daily-list" style="margin-top:20rem;grid-template-columns:repeat(3,1fr);">
-      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--navy-900)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
       <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--gold-dark)">${xp}</div><div style="font-size:11px;color:var(--muted)">经验值</div></div>
       <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:#f59e0b">${st.streak}</div><div style="font-size:11px;color:var(--muted)">连续打卡</div></div>
     </div>
