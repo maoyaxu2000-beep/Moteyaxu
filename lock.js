@@ -8,7 +8,7 @@
 'use strict';
 (function(){
   const STORE = 'wbAccess';
-  const APP_SCRIPTS = ['app.js', 'engine.js', 'drills.js'];
+  const APP_SCRIPTS = ['app.js', 'features.js', 'engine.js', 'drills.js'];
   const te = new TextEncoder(), td = new TextDecoder();
   const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
   const b64e = u => btoa(String.fromCharCode(...new Uint8Array(u)));

@@ -893,3 +893,21 @@ html,body,button,.tab,.chip,.free-card,.list-item,.ex-opt,.map-node{touch-action
 .free-more{padding:12rem 24rem;font-size:12px;}
 .free-more::before{content:'';position:absolute;inset:-14rem -10rem;}
 .muted,.li-cn,.func-desc{color:#5e6575;}
+
+/* ===========================================================
+   v5 · 今日复习 / 收藏 / 速查 / 展示卡 / 备份 / 跟读 / 海报 / 深色
+=========================================================== */
+/* --- 今日复习入口 --- */
+.srs-card{display:flex;align-items:center;gap:20rem;margin-top:18rem;padding:22rem 26rem;border-radius:28rem;
+  background:linear-gradient(150deg,rgba(255,255,255,.86),rgba(214,228,255,.72));border:1rem solid var(--glass-line);
+  box-shadow:var(--glass-hi),var(--glass-shadow);transition:transform .15s;}
+.srs-card:active{transform:scale(.98);}
+.srs-ic{width:72rem;height:72rem;flex-shrink:0;border-radius:24rem;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#5b8def,#2f62e0);color:#fff;box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4);}
+.srs-ic .icon{width:34rem;height:34rem;stroke-width:2;}
+.srs-main{flex:1;min-width:0;}
+.srs-title{font-size:16px;font-weight:750;color:var(--navy-900);}
+.srs-title b{color:var(--blue);font-size:19px;margin:0 2rem;}
+.srs-sub{font-size:11px;color:#5e6575;margin-top:4rem;}
+.srs-card.done{background:rgba(227,243,234,.8);}
+.srs-card.done .srs-ic{background:linear-gradient(180deg,#46c48a,#23805a);}

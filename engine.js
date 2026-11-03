@@ -434,6 +434,7 @@ function collectMissedWord(word){
     s.missedWords = s.missedWords || [];
     if(!s.missedWords.includes(word.word)) s.missedWords.push(word.word);
   }
+  srsGrade('w', word.word, false);
   const arr = LS.get('wrongWords', []);
   if(!arr.find(x=>x.word===word.word)){
     arr.push(word);
@@ -510,6 +511,7 @@ function finishLesson(){
   const set = new Set(LS.get('studiedWords',[]));
   s.node.words.forEach(w=>set.add(w.word));
   LS.set('studiedWords',[...set]);
+  s.node.words.forEach(w=>srsSeen('w', w.word));     // 答错的词在 collectMissedWord 里已回到 0 号盒，这里只登记新词
   refreshLesson(true);
 }
 function renderLessonResult(){

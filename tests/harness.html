@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!-- 测试页：不经过邀请码进入页，直接用一份模拟学习内容加载 App，供 tests/smoke.js 使用。
+     模拟内容的字段与真实 data.enc 解密后的结构一致，数量足够让关卡、测验、情景判断都能跑通。 -->
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#111d33">
+<link rel="stylesheet" href="../style.css"></head><body>
+<div class="app"><div class="topbar" id="topbar"><button class="back" onclick="goBack()">‹</button><div class="title" id="topTitle">五班英语角</div><div class="act" id="topAct"></div></div><div id="root"></div></div>
+<div class="tabbar" id="tabbar"></div><div class="toast" id="toast"></div>
+<script>
+(function(){
+  const cats = ['基础', '安检', '客舱'];
+  const usages = ['radio', 'face', 'write', 'life'];
+  const words = Array.from({length: 40}, (_, i) => ({
+    word: 'word' + i, phonetic: '/wɜːd' + i + '/', meaning: '释义' + i, category: cats[i % 3], usage: usages[i % 4],
+    example: 'Please check the item number ' + ['one','two','three','four','five','six','seven','eight','nine','ten'][i % 10] + ' now',
+    exampleCn: '请现在检查第' + i + '项'
+  }));
+  const speaking = [
+    { category: '安检用语', list: [
+      { en: 'Please remain seated.', cn: '请保持坐好。' }, { en: 'Show me your ID, please.', cn: '请出示您的证件。' },
+      { en: 'Please fasten your seat belt.', cn: '请系好安全带。' }, { en: 'Step this way, please.', cn: '请往这边走。' } ] },
+    { category: '客舱用语', list: [
+      { en: 'Please stow your bag overhead.', cn: '请把包放进行李架。' }, { en: 'Turn off your phone, please.', cn: '请关闭手机。' },
+      { en: 'May I see your boarding pass?', cn: '请出示登机牌。' }, { en: 'Keep calm and follow me.', cn: '请保持冷静跟我来。' } ] },
+    { category: '处置用语', list: [
+      { en: 'Put your hands behind your back.', cn: '双手放到背后。' }, { en: 'Do not resist.', cn: '不要反抗。' },
+      { en: 'You are under restraint.', cn: '你已被约束。' }, { en: 'Stay where you are.', cn: '待在原地。' } ] }
+  ];
+  const dl = (cn, en) => ({ cn, en });
+  const drills = [{ key: 'a', cls: '旅客劝导类', clsEn: 'Persuading passengers', icon: 'talk', scenes: [
+    { id: 'd1', no: 1, title: '旅客拒绝关机', titleEn: 'Refusing to switch off', sub: '', to: '旅客', brief: [{ cn: '旅客在起飞前拒绝关闭手机', en: 'A passenger refuses to turn off the phone' }],
+      groups: [{ cn: '劝导', en: 'Persuade', lines: [dl('先生，请关闭手机。', 'Sir, please turn off your phone.'), dl('这是为了飞行安全。', 'This is for flight safety.')] }] },
+    { id: 'd2', no: 2, title: '旅客拒绝系安全带', titleEn: 'Refusing seat belt', sub: '', to: '旅客', brief: [],
+      groups: [{ cn: '', en: '', lines: [dl('请系好安全带。', 'Please fasten your seat belt.'), dl('飞机正在颠簸。', 'The aircraft is experiencing turbulence.')] }] }
+  ] }];
+  const dialogues = [{ category: '安检', list: [{ title: '证件检查', dialogue: [
+    { role: 'officer', text: 'Good morning. May I see your passport?', textCn: '早上好，请出示护照。' },
+    { role: 'passenger', text: 'Sure, here you are.', textCn: '好的，给您。' }] }] }];
+  const security = [{ part: '第一部分', partEn: 'Part One', categories: [{ category: '基础用语', categoryEn: 'Basics', items: [
+    { en: 'Security check, please cooperate.', cn: '安检，请配合。' },
+    { type: 'qa', q: { en: 'What is in your bag?', cn: '包里有什么？' }, a: { en: 'Only clothes.', cn: '只有衣服。' } }] }] }];
+  const scenarios = [{ id: 's1', icon: 'alert', title: '登机口纠纷', titleEn: 'Gate dispute', scene: 'gate', brief: '旅客在登机口大声喧哗，你需要处置。', endText: '旅客平静下来，顺利登机。', start: 'n1', nodes: {
+    n1: { narration: '旅客大声喧哗，你怎么说？', choices: [
+      { en: 'Sir, please calm down.', cn: '先生，请冷静。', correct: true, next: 'end', feedback: '得体、克制。' },
+      { en: 'Shut up.', cn: '闭嘴。', correct: false, next: 'end', feedback: '不得体。' }] } } }];
+  const units = [
+    { id: 'u1', title: 'Unit 1 · 登机与安检', titleEn: 'Boarding & Security', icon: 'plane', categories: ['基础', '安检'], story: 's1' },
+    { id: 'u2', title: 'Unit 2 · 客舱', titleEn: 'Cabin', icon: 'seat', categories: ['客舱'] }
+  ];
+  window.DATA = { LESSON_SIZE: 7, words, speaking, units, scenarios, dialogues, security, drills };
+  /* 测试环境没有邀请码：给语音/解密一个空壳，让 app.js 走系统朗读分支 */
+  window.ACCESS = null;
+})();
+</script>
+<script src="../icons.js"></script><script src="../app.js"></script><script src="../features.js"></script><script src="../engine.js"></script><script src="../drills.js"></script>
+</body></html>

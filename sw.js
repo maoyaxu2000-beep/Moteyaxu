@@ -1,10 +1,10 @@
 /* 离线缓存 service worker —— 让整站可在无网络环境下完整使用
    学习内容（data.enc）和语音（audio/*.bin）都是密文，缓存的也是密文，由页面用邀请码解开的密钥解密 */
-const CACHE = 'wuban-english-v22';
+const CACHE = 'wuban-english-v23';
 /* 语音单独一个缓存，版本升级时不清空，省流量。
    v2：改为加密音频；地址带 ?k=密钥编号，管理员更换主密钥后自动换成新文件 */
 const AUDIO_CACHE = 'wuban-audio-v2';
-const ASSETS = ['./','./index.html','./style.css','./icons.js','./lock.js','./app.js','./engine.js','./drills.js',
+const ASSETS = ['./','./index.html','./style.css','./icons.js','./lock.js','./app.js','./features.js','./engine.js','./drills.js',
   './audio/gb.js','./audio/us.js','./audio/gb2.js','./audio/us2.js',
   './icon.svg','./manifest.webmanifest'];
 

@@ -309,6 +309,8 @@ function renderHome(){
       <div class="cc-go">${icon('play')}</div>
     </div>
 
+    ${srsHomeCard()}
+
     <div class="section" style="margin-top:34rem">
       <div class="section-head"><div class="section-head-left"><span class="section-title">自由学习</span></div><span class="section-sub">点卡片直接开始</span></div>
       <div class="free-row">
@@ -492,9 +494,9 @@ function renderFlash(){
 }
 function revealWord(){ wordSession.revealed=!wordSession.revealed; refresh(); const w=wordSession.list[wordSession.idx]; if(wordSession.revealed) speak(w.word); }
 function nextWord(){ const s=wordSession; if(s.idx<s.list.length-1){ s.idx++; s.revealed=false; refresh(); } else finishWords(); }
-function markKnownNext(){ const w=wordSession.list[wordSession.idx]; const set=new Set(LS.get('studiedWords',[])); set.add(w.word); LS.set('studiedWords',[...set]); nextWord(); }
-function addWrong(){ const w=wordSession.list[wordSession.idx]; const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===w.word)){ arr.push(w); LS.set('wrongWords',arr); toast('已加入生词本'); } else toast('已在生词本中'); }
-function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); } else refresh(); }
+function markKnownNext(){ const w=wordSession.list[wordSession.idx]; const set=new Set(LS.get('studiedWords',[])); set.add(w.word); LS.set('studiedWords',[...set]); srsGrade('w',w.word,true); nextWord(); }
+function addWrong(){ const w=wordSession.list[wordSession.idx]; srsGrade('w',w.word,false); const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===w.word)){ arr.push(w); LS.set('wrongWords',arr); toast('已加入生词本'); } else toast('已在生词本中'); }
+function removeWrong(){ const s=wordSession; const w=s.list[s.idx]; srsGrade('w',w.word,true); let arr=LS.get('wrongWords',[]); arr=arr.filter(x=>x.word!==w.word); LS.set('wrongWords',arr); s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false; toast('已移除'); if(!s.list.length){ goBack(); } else refresh(); }
 function finishWords(){ toast('本组学习完成'); goBack(); }
 
 /* =========================================================
@@ -595,16 +597,19 @@ function markPhraseKnown(){
   const p=phraseSession.list[phraseSession.idx];
   const set=new Set(LS.get('studiedPhrases',[])); set.add(p.en); LS.set('studiedPhrases',[...set]);
   const w=LS.get('wrongPhrases',[]).filter(x=>x!==p.en); LS.set('wrongPhrases',w);
+  srsGrade('p',p.en,true);
   nextPhrase();
 }
 function addWrongPhrase(){
   const p=phraseSession.list[phraseSession.idx]; const arr=LS.get('wrongPhrases',[]);
+  srsGrade('p',p.en,false);
   if(!arr.includes(p.en)){ arr.push(p.en); LS.set('wrongPhrases',arr); toast('已加入待复习'); } else toast('已在待复习中');
 }
 function removeWrongPhrase(){
   const s=phraseSession, p=s.list[s.idx];
   LS.set('wrongPhrases',LS.get('wrongPhrases',[]).filter(x=>x!==p.en));
   const set=new Set(LS.get('studiedPhrases',[])); set.add(p.en); LS.set('studiedPhrases',[...set]);
+  srsGrade('p',p.en,true);
   s.list.splice(s.idx,1); if(s.idx>=s.list.length) s.idx=Math.max(0,s.list.length-1); s.revealed=false;
   toast('已移除'); if(!s.list.length) goBack(); else refresh();
 }
@@ -723,7 +728,7 @@ function quizPick(i){
   if(quiz.answered) return; quiz.answered=true; quiz.picked=i;
   const q=quiz.questions[quiz.idx];
   if(quiz.mode==='cn2en') speak(q.opts[i].text);
-  if(q.opts[i].correct){ quiz.correct++; } else { quiz.wrong.push(q.target);
+  if(q.opts[i].correct){ quiz.correct++; srsSeen('w',q.target.word); } else { quiz.wrong.push(q.target); srsGrade('w',q.target.word,false);
     const arr=LS.get('wrongWords',[]); if(!arr.find(x=>x.word===q.target.word)){ arr.push(q.target); LS.set('wrongWords',arr); } }
   const set=new Set(LS.get('studiedWords',[])); set.add(q.target.word); LS.set('studiedWords',[...set]);
   refresh();

@@ -30,6 +30,7 @@ function markDrill(id, ok){
   if(ok){ m[id] = Date.now(); delete w[id]; }
   else  { w[id] = Date.now(); delete m[id]; }
   LS.set('drillMastery', m); LS.set('drillWeak', w);
+  srsGrade('l', id, ok);
 }
 function sceneDone(s, m){ m = m || drillMastery(); return s.lineIds.filter(id => m[id]).length; }
 
