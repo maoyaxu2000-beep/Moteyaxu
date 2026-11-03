@@ -102,6 +102,7 @@ let speakChain=false;   // 连播链内部调用 speak 时置 true
 let dlgRun=null;
 function stopSpeak(){
   playToken++;
+  if(typeof recStopPlay==='function') recStopPlay();
   markPlaying(null);
   try{ player.pause(); }catch(e){}
   try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
@@ -129,6 +130,7 @@ function chipIcon(playing){ return `<span class="pi chip-pi${playing?' on':''}">
 /* speak(text [,lang] [,onend] [,voice])
    voice: 'b' = 对话中的另一方音色；onend 只在正常播完时回调（被打断不回调） */
 function speak(text, lang, onend, voice){
+  if(typeof recStopPlay==='function') recStopPlay();
   const token=++playToken;
   try{ player.pause(); }catch(e){}
   try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
@@ -395,6 +397,7 @@ function renderHome(){
       <div class="checkin-card">
         <div class="week-row">${week}</div>
         <button class="btn ${st.checked?'done':'gold'}" onclick="doCheckin()">${st.checked?icon('check')+' 今日已完成':'立即打卡'}</button>
+        ${st.checked?`<button class="btn ghost" style="margin-top:14rem" onclick="openPoster()">${icon('share')} 生成打卡海报</button>`:''}
       </div>
     </div>
     <div class="safe"></div>

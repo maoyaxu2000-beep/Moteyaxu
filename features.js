@@ -736,3 +736,177 @@ function checkUpdate(){
 
 /* 没有朗读内容的页面不显示语速悬浮钮，免得挡住文字 */
 function noSpeedPage(r){ return r === renderBackup || r === renderAbout; }
+
+/* =========================================================
+   4a. 跟读录音对比
+   录一遍自己读的，再和标准原声一前一后对着听。录音只留在内存里，不上传、不保存；
+   换一句或重录就丢掉。需要麦克风权限；不支持录音的浏览器里按钮自动隐藏。
+========================================================= */
+const REC_OK = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+const REC_MAX_MS = 12000;
+let rec = { state: 'idle', key: null, url: null, mr: null, chunks: [], timer: null };
+let recAudio = null;
+
+function recToolBtn(en){
+  if(!REC_OK) return '';
+  const k = audioKey(en), mine = rec.key === k, a = lnData(en, '');
+  if(mine && rec.state === 'recording')
+    return `<span class="lt-btn rec on" ${a} role="button" onclick="recStop()"><b class="rec-dot"></b><i>录音中 · 点此结束</i></span>`;
+  if(mine && rec.state === 'ready')
+    return `<span class="lt-btn" ${a} role="button" onclick="recPlayMine()">${icon('play')}<i>我的录音</i></span>
+      <span class="lt-btn" ${a} role="button" onclick="recCompare(this)">${icon('refresh')}<i>原声 → 我的</i></span>
+      <span class="lt-btn" ${a} role="button" onclick="recStart(this)">${icon('mic')}<i>重录</i></span>`;
+  return `<span class="lt-btn" ${a} role="button" onclick="recStart(this)">${icon('mic')}<i>跟读</i></span>`;
+}
+function recDiscard(){
+  clearTimeout(rec.timer);
+  try{ if(rec.mr && rec.mr.state !== 'inactive'){ rec.mr.onstop = null; rec.mr.stop(); } }catch(e){}
+  try{ rec.stream && rec.stream.getTracks().forEach(t => t.stop()); }catch(e){}
+  recStopPlay();
+  if(rec.url) URL.revokeObjectURL(rec.url);
+  rec = { state: 'idle', key: null, url: null, mr: null, chunks: [], timer: null };
+}
+function recStopPlay(){ if(recAudio){ const a = recAudio; recAudio = null; try{ a.pause(); a.removeAttribute('src'); a.load(); }catch(e){} } }   // 先释放媒体资源，再撤销地址，否则浏览器会报「文件不存在」
+async function recStart(el){
+  const en = el.dataset.en, key = audioKey(en);
+  recDiscard(); stopSpeak();
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+    const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    rec = { state: 'recording', key, url: null, mr, stream, chunks: [], timer: setTimeout(recStop, REC_MAX_MS) };
+    mr.ondataavailable = e => { if(e.data && e.data.size) rec.chunks.push(e.data); };
+    mr.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      if(rec.mr !== mr) return;
+      const blob = new Blob(rec.chunks, { type: mr.mimeType || mime || 'audio/webm' });
+      if(blob.size < 1200){ rec.state = 'idle'; rec.key = null; toast('没录到声音，靠近麦克风再试一次'); }
+      else { rec.url = URL.createObjectURL(blob); rec.state = 'ready'; }
+      refresh();
+    };
+    mr.start();
+    refresh();
+  }catch(e){
+    rec = { state: 'idle', key: null, url: null, mr: null, chunks: [], timer: null };
+    toast(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? '没有麦克风权限：请在浏览器/系统设置里允许使用麦克风' : '这台设备暂时无法录音');
+  }
+}
+function recStop(){ clearTimeout(rec.timer); try{ if(rec.mr && rec.mr.state === 'recording') rec.mr.stop(); }catch(e){} }
+function recPlayMine(onend){
+  if(!rec.url) return;
+  stopSpeak(); recStopPlay();
+  const a = new Audio(rec.url); recAudio = a;
+  a.onended = () => { if(recAudio === a){ recAudio = null; if(typeof onend === 'function') onend(); } };
+  a.play().catch(() => toast('播放失败，请再点一次'));
+}
+/* 先放标准原声，播完紧接着放自己的录音，方便对着听差距 */
+function recCompare(el){
+  if(!rec.url) return;
+  speak(el.dataset.en, null, () => setTimeout(() => recPlayMine(), 350));
+}
+document.addEventListener('visibilitychange', () => { if(document.hidden) recStop(); });
+
+/* =========================================================
+   4b. 打卡海报：画在 canvas 上，可分享或长按保存。不含邀请码。
+========================================================= */
+const POSTER_FONT = "'PingFang SC','Hiragino Sans GB','Microsoft YaHei','Noto Sans CJK SC',sans-serif";
+function posterIcon(ctx, name, x, y, size, color, lw){
+  const d = [...(ICONS[name] || '').matchAll(/\sd="([^"]+)"/g)].map(m => m[1]);
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = lw || 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  d.forEach(p => ctx.stroke(new Path2D(p)));
+  ctx.restore();
+}
+/* 英文按词、中文按字换行 */
+function wrapLines(ctx, text, maxW){
+  const toks = String(text).match(/[A-Za-z0-9'’\-.,;:!?()\/]+\s*|[^\sA-Za-z0-9]|\s+/g) || [];
+  const lines = []; let cur = '';
+  toks.forEach(t => {
+    if(ctx.measureText(cur + t).width > maxW && cur.trim()){ lines.push(cur.trimEnd()); cur = t.trimStart(); } else cur += t;
+  });
+  if(cur.trim()) lines.push(cur.trimEnd());
+  return lines;
+}
+function rrect(ctx, x, y, w, h, r){
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function drawPoster(){
+  const W = 1080, H = 1620, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const st = calcStreak(), name = LS.get('displayName', '') || '用户';
+  const studied = LS.get('studiedWords', []).length, phr = LS.get('studiedPhrases', []).length;
+  const xp = typeof totalXP === 'function' ? totalXP() : 0, lv = typeof userLevel === 'function' ? userLevel() : 1;
+  const now = new Date(), wd = '日一二三四五六'[now.getDay()], pk = dailyPick().p;
+  /* 背景 */
+  let g = x.createLinearGradient(0, 0, W * .4, H); g.addColorStop(0, '#24396a'); g.addColorStop(.55, '#142039'); g.addColorStop(1, '#0b1424');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  let r = x.createRadialGradient(W * .9, H * .06, 0, W * .9, H * .06, 620); r.addColorStop(0, 'rgba(240,168,46,.42)'); r.addColorStop(1, 'rgba(240,168,46,0)');
+  x.fillStyle = r; x.fillRect(0, 0, W, H);
+  r = x.createRadialGradient(W * .05, H * .95, 0, W * .05, H * .95, 700); r.addColorStop(0, 'rgba(91,141,239,.30)'); r.addColorStop(1, 'rgba(91,141,239,0)');
+  x.fillStyle = r; x.fillRect(0, 0, W, H);
+  /* 顶部 */
+  x.textBaseline = 'alphabetic'; x.fillStyle = '#fff'; x.font = `800 46px ${POSTER_FONT}`; x.fillText('五班英语角', 84, 150);
+  x.fillStyle = 'rgba(255,255,255,.6)'; x.font = `500 28px ${POSTER_FONT}`; x.fillText('空保执勤英语 · 每日打卡', 84, 200);
+  x.textAlign = 'right'; x.fillStyle = '#ffd987'; x.font = `800 84px ${POSTER_FONT}`; x.fillText(String(now.getDate()).padStart(2, '0'), W - 84, 160);
+  x.fillStyle = 'rgba(255,255,255,.6)'; x.font = `500 28px ${POSTER_FONT}`; x.fillText(`${now.getMonth() + 1}月 · 星期${wd}`, W - 84, 204); x.textAlign = 'left';
+  /* 连续打卡 */
+  posterIcon(x, 'flame', W / 2 - 78, 300, 156, '#ffb23e', 1.5);
+  x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = `900 210px ${POSTER_FONT}`; x.fillText(String(st.streak), W / 2, 640);
+  x.fillStyle = '#ffd987'; x.font = `700 44px ${POSTER_FONT}`; x.fillText(st.streak > 0 ? '天连续打卡' : '今天开始打卡', W / 2, 712);
+  x.fillStyle = 'rgba(255,255,255,.7)'; x.font = `500 32px ${POSTER_FONT}`; x.fillText(`${name} · Lv.${lv} · 累计打卡 ${st.total} 天`, W / 2, 780);
+  /* 三个数字 */
+  const cards = [[studied, '已学单词'], [phr, '已学短语'], [xp, '经验值 XP']], cw = 292, gap = 30, cx0 = (W - (cw * 3 + gap * 2)) / 2;
+  cards.forEach(([n, t], i) => {
+    const cx = cx0 + i * (cw + gap), cy = 850;
+    x.fillStyle = 'rgba(255,255,255,.09)'; rrect(x, cx, cy, cw, 190, 36); x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.16)'; x.lineWidth = 2; x.stroke();
+    x.fillStyle = '#fff'; x.font = `800 70px ${POSTER_FONT}`; x.fillText(String(n), cx + cw / 2, cy + 96);
+    x.fillStyle = 'rgba(255,255,255,.62)'; x.font = `500 27px ${POSTER_FONT}`; x.fillText(t, cx + cw / 2, cy + 148);
+  });
+  /* 今日金句：卡片高度跟着内容走 */
+  x.textAlign = 'left';
+  x.font = `700 44px ${POSTER_FONT}`; const enL = wrapLines(x, pk.en, W - 252).slice(0, 3);
+  x.font = `500 30px ${POSTER_FONT}`; const cnL = wrapLines(x, pk.cn, W - 252).slice(0, 2);
+  const qh = 112 + enL.length * 58 + cnL.length * 44 + 44, qy = 1110 + Math.max(0, (330 - qh) / 2);
+  x.fillStyle = 'rgba(255,255,255,.07)'; rrect(x, 84, qy, W - 168, qh, 40); x.fill();
+  x.fillStyle = '#f0a82e'; x.font = `700 26px ${POSTER_FONT}`; x.fillText('今日金句', 126, qy + 62);
+  x.fillStyle = '#fff'; x.font = `700 44px ${POSTER_FONT}`;
+  let y = qy + 130; enL.forEach(l => { x.fillText(l, 126, y); y += 58; });
+  x.fillStyle = 'rgba(255,255,255,.66)'; x.font = `500 30px ${POSTER_FONT}`; y += 4;
+  cnL.forEach(l => { x.fillText(l, 126, y); y += 44; });
+  /* 底部 */
+  x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,.5)'; x.font = `500 26px ${POSTER_FONT}`;
+  x.fillText('坚持每天学一点，开口更有底气', W / 2, 1530);
+  x.fillStyle = 'rgba(255,255,255,.3)'; x.font = `500 22px ${POSTER_FONT}`; x.fillText('五班英语角 · 内部学习', W / 2, 1572);
+  return c;
+}
+let posterBlob = null, posterUrl = null;
+function openPoster(){
+  closePoster();
+  let canvas; try{ canvas = drawPoster(); }catch(e){ toast('海报生成失败'); return; }
+  const m = document.createElement('div'); m.id = 'posterMask'; m.className = 'modal-mask poster-mask';
+  m.innerHTML = `<div class="poster-box"><div class="poster-img" id="posterImg"><div class="sub" style="color:#fff">生成中…</div></div>
+    <div class="poster-tip">长按图片可保存</div>
+    <div class="bk-row" style="margin-top:12rem"><button class="btn gold" onclick="posterShare()">${icon('share')} 分享 / 保存</button><button class="btn ghost" onclick="closePoster()">关闭</button></div></div>`;
+  m.onclick = e => { if(e.target === m) closePoster(); };
+  document.body.appendChild(m);
+  canvas.toBlob(b => {
+    if(!b || !document.getElementById('posterMask')) return;
+    posterBlob = b; posterUrl = URL.createObjectURL(b);
+    document.getElementById('posterImg').innerHTML = `<img src="${posterUrl}" alt="打卡海报">`;
+  }, 'image/png');
+}
+function closePoster(){
+  const m = document.getElementById('posterMask'); if(m) m.remove();
+  if(posterUrl){ URL.revokeObjectURL(posterUrl); posterUrl = null; } posterBlob = null;
+}
+async function posterShare(){
+  if(!posterBlob){ toast('海报还在生成'); return; }
+  const name = `五班英语角打卡-${todayStr()}.png`, file = new File([posterBlob], name, { type: 'image/png' });
+  try{
+    if(navigator.canShare && navigator.canShare({ files: [file] })){ await navigator.share({ files: [file], title: '五班英语角打卡' }); return; }
+  }catch(e){ if(e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = posterUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  toast('已保存；微信里请长按图片保存');
+}

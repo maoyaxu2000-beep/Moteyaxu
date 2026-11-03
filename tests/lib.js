@@ -17,8 +17,8 @@ function serve(port){
     }).listen(port, '127.0.0.1', () => ok(srv));
   });
 }
-async function launch(opts){
-  const browser = await chromium.launch({ args: ['--no-sandbox'] });
+async function launch(opts, extraArgs){
+  const browser = await chromium.launch({ args: ['--no-sandbox'].concat(extraArgs || []) });
   const ctx = await browser.newContext(Object.assign({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, permissions: [] }, opts || {}));
   return { browser, ctx };
 }

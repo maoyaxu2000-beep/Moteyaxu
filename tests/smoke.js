@@ -3,10 +3,11 @@ const { serve, launch, check, done } = require('./lib');
 
 (async () => {
   const srv = await serve(8123);
-  const { browser, ctx } = await launch();
+  const { browser, ctx } = await launch({ permissions: ['microphone'] }, ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
+  page.on('requestfailed', r => { if(process.env.DEBUG_REQ) console.log('   [requestfailed]', r.url().slice(0, 100), r.failure() && r.failure().errorText); });
   page.on('console', m => { if(m.type() === 'error') errors.push(m.text()); });
   const url = 'http://127.0.0.1:8123/tests/harness.html';
   const ev = (fn, arg) => page.evaluate(fn, arg);
@@ -101,6 +102,30 @@ const { serve, launch, check, done } = require('./lib');
   await page.fill('#sIn', 'passport'); await page.keyboard.press('Enter');
   check('回车后记入最近查过', await ev(() => LS.get('recentSearch', []).includes('passport')));
   await ev(() => goBack());
+
+  console.log('· 跟读录音');
+  await ev(() => { phraseSession = { list: allPhrases().slice(0, 3), idx: 0, revealed: true, mode: 'study', cat: 't' }; navigate(renderPhraseFlash, 't', ''); });
+  check('支持录音的环境里显示「跟读」按钮', await page.locator('.lt-btn:has-text("跟读")').count() === 1);
+  await page.locator('.lt-btn:has-text("跟读")').click();
+  await page.waitForSelector('.lt-btn.rec.on');
+  check('点击后进入录音中', true);
+  await page.waitForTimeout(1500);
+  await page.locator('.lt-btn.rec.on').click();
+  await page.waitForSelector('.lt-btn:has-text("我的录音")', { timeout: 5000 });
+  check('结束后出现「我的录音」「原声 → 我的」「重录」', await page.locator('.lt-btn:has-text("原声")').count() === 1 && await page.locator('.lt-btn:has-text("重录")').count() === 1);
+  await page.locator('.lt-btn:has-text("我的录音")').click();
+  check('可以播放自己的录音', await ev(() => !!recAudio));
+  await ev(() => { recDiscard(); goBack(); });
+
+  console.log('· 打卡海报');
+  await ev(() => { doCheckin(); });
+  await page.locator('text=生成打卡海报').click();
+  await page.waitForSelector('#posterImg img', { timeout: 5000 });
+  const dim = await ev(() => { const i = document.querySelector('#posterImg img'); return new Promise(ok => { if(i.complete) ok([i.naturalWidth, i.naturalHeight]); else i.onload = () => ok([i.naturalWidth, i.naturalHeight]); }); });
+  check('海报是 1080×1620 的图片', dim[0] === 1080 && dim[1] === 1620, dim);
+  if(process.env.SHOT_DIR) await page.screenshot({ path: process.env.SHOT_DIR + '/poster.png' });
+  await ev(() => closePoster());
+  check('关闭海报后移除', await page.locator('#posterMask').count() === 0);
 
   console.log('· 备份与恢复');
   await ev(() => { LS.set('xp', 300); LS.set('lessonProgress', { 'u1-l1': { stars: 3, xp: 80 } }); LS.set('displayName', '测试员');
