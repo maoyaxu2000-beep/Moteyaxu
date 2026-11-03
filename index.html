@@ -28,11 +28,14 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- 首屏占位：浏览器一拿到页面就有画面，不再先白屏等脚本；lock.js 接手后替换内容 -->
+<div id="gate"><div class="gate-card"><img class="gate-logo" src="icon.svg" alt=""><div class="gate-sub" style="margin-top:20px">正在加载…</div></div></div>
+
 <!-- 学习内容与语音都是加密的：lock.js 验证邀请码、解密后再加载 app.js / engine.js / drills.js -->
-<script src="audio/gb.js"></script>
-<script src="audio/us.js"></script>
-<script src="audio/gb2.js"></script>
-<script src="audio/us2.js"></script>
+<script src="audio/gb.js" async></script>
+<script src="audio/us.js" async></script>
+<script src="audio/gb2.js" async></script>
+<script src="audio/us2.js" async></script>
 <script src="icons.js"></script>
 <script src="lock.js"></script>
 <script>

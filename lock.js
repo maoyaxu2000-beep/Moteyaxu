@@ -45,36 +45,61 @@
     }catch(e){ return null; }
   }
 
-  async function fetchKeys(){
+  /* 联网取钥匙表：带超时，网络差时不会一直卡住（超时按「离线」处理） */
+  async function fetchKeys(ms){
+    const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 8000);
     try{
-      const r = await fetch('keys.json', { cache:'no-cache' });
+      const r = await fetch('keys.json', { cache:'no-cache', signal:c.signal });
       return r.ok ? await r.json() : null;
-    }catch(e){ return null; }   // 离线
+    }catch(e){ return null; }   // 离线 / 超时
+    finally{ clearTimeout(t); }
   }
 
-  /* ---------- 启动 ---------- */
+  /* 进入页后台取钥匙表和点「进入」时共用同一个请求：两个相同请求会被浏览器排队，等两轮 */
+  let keysPromise = null;
+  function getKeys(){
+    if(!keysPromise) keysPromise = fetchKeys().then(k => { if(!k) keysPromise = null; return k; });
+    return keysPromise;
+  }
+
+  /* ---------- 提速：脚本与密文并行预取，不再一个接一个串行下载 ---------- */
+  const saved0 = readStore();
+  APP_SCRIPTS.forEach(s => { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = s; document.head.appendChild(l); });
+  const earlyData = (saved0 && saved0.kid) ? fetch('data.enc?k=' + saved0.kid).catch(() => null) : null;
+  let blocked = false;   // 后台校验发现码被停用/过期后，禁止再撤掉进入页
+
+  /* ---------- 启动 ----------
+     旧流程：先联网取 keys.json → 校验 → 才开始加载内容，网络慢时要干等。
+     现在：本机已有有效密钥就立刻进入，联网校验放到后台，结果回来再处理（停用/换密钥）。 */
   async function boot(){
     if(!(window.crypto && crypto.subtle)){ showGate('当前浏览器不支持加密功能，请用手机自带浏览器或微信打开最新版本'); return; }
     const saved = readStore();
-    const keys = await fetchKeys();
-    if(!saved){ showGate('', keys); return; }
-    const id = normCode(saved.code).slice(0, 4);
-    const entry = keys && (keys.entries || []).find(e => e.id === id);
-    const ttl = keys ? ((entry && entry.ttl) || 0) : (saved.ttl || 0);   // 离线时用上次记下的有效期
+    if(!saved){ showGate(''); getKeys().then(k => { if(k) gateKeys = k; }); return; }   // 先显示输入页，钥匙表后台取
+    const ttl = saved.ttl || 0;
     if(isExpired(saved.code, ttl)){
       localStorage.removeItem(STORE);
-      showGate(EXPIRED_MSG(ttl), keys); return;
+      showGate(EXPIRED_MSG(ttl)); return;
     }
-    if(!keys){ return start(b64d(saved.k), saved.kid, saved.code, ttl); }   // 离线：用本机已保存的密钥
-    if(!entry){
-      localStorage.removeItem(STORE);
-      showGate('你的邀请码已停用，请向管理员索取新的邀请码', keys); return;
+    start(b64d(saved.k), saved.kid, saved.code, ttl);
+    verifyInBackground(saved);
+  }
+
+  async function verifyInBackground(saved){
+    const keys = await fetchKeys(10000);
+    if(!keys) return;                                   // 离线 / 超时：继续用本机已保存的密钥
+    const entry = (keys.entries || []).find(e => e.id === normCode(saved.code).slice(0, 4));
+    if(!entry){ blocked = true; localStorage.removeItem(STORE); showGate('你的邀请码已停用，请向管理员索取新的邀请码', keys); return; }
+    const ttl = entry.ttl || 0;
+    if(isExpired(saved.code, ttl)){ blocked = true; localStorage.removeItem(STORE); showGate(EXPIRED_MSG(ttl), keys); return; }
+    if(keys.kid === saved.kid){
+      if(saved.ttl !== ttl) writeStore(Object.assign({}, saved, { ttl }));
+      if(window.ACCESS){ window.ACCESS.ttl = ttl; window.ACCESS.expiresAt = expiresAt(saved.code, ttl); }
+      return;
     }
-    if(keys.kid === saved.kid){ if(saved.ttl !== ttl) writeStore(Object.assign(saved, { ttl })); return start(b64d(saved.k), saved.kid, saved.code, ttl); }
-    const got = await unwrap(keys, saved.code);                      // 主密钥已更换：用保存的码重新解
-    if(!got){ localStorage.removeItem(STORE); showGate('邀请码需要重新验证，请重新输入', keys); return; }
+    const got = await unwrap(keys, saved.code);          // 主密钥已更换：用保存的码重新解，然后重载拿新内容
+    if(!got){ blocked = true; localStorage.removeItem(STORE); showGate('邀请码需要重新验证，请重新输入', keys); return; }
     writeStore({ code:saved.code, kid:keys.kid, k:b64e(got.raw), ttl:got.ttl });
-    start(got.raw, keys.kid, saved.code, got.ttl);
+    location.reload();
   }
 
   async function start(raw, kid, code, ttl){
@@ -83,14 +108,16 @@
       const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
       window.ACCESS = { key, kid, decrypt:(buf) => aesDecrypt(key, buf),
                         ttl:ttl || 0, expiresAt:expiresAt(code, ttl), codeId:normCode(code).slice(0, 4) };
-      const r = await fetch('data.enc?k=' + kid);
+      let r = (earlyData && saved0 && saved0.kid === kid) ? await earlyData : null;   // 复用启动时就发出的请求
+      if(!r || !r.ok) r = await fetch('data.enc?k=' + kid);
       if(!r.ok) throw new Error('data');
       const text = td.decode(await aesDecrypt(key, await r.arrayBuffer()));
       new Function(text)();                                          // 定义 window.DATA
       for(const s of APP_SCRIPTS) await loadScript(s);
-      hideGate();
+      if(!blocked) hideGate();
       addWatermark();
     }catch(e){
+      if(blocked) return;
       showGate(navigator.onLine ? '内容加载失败，请重新输入邀请码或稍后再试' : '首次使用需要联网，请连接网络后再打开', null, true);
     }
   }
@@ -134,7 +161,7 @@
     const code = document.getElementById('gateCode').value;
     if(normCode(code).length !== 16){ msg.textContent = '邀请码是 16 位字母数字，请检查'; return; }
     btn.disabled = true; btn.textContent = '验证中…'; msg.textContent = '';
-    const keys = gateKeys || await fetchKeys();
+    const keys = gateKeys || await getKeys();
     if(!keys){ btn.disabled = false; btn.textContent = '进入'; msg.textContent = '首次验证需要联网'; return; }
     gateKeys = keys;
     const got = await unwrap(keys, code);

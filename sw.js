@@ -1,6 +1,6 @@
 /* 离线缓存 service worker —— 让整站可在无网络环境下完整使用
    学习内容（data.enc）和语音（audio/*.bin）都是密文，缓存的也是密文，由页面用邀请码解开的密钥解密 */
-const CACHE = 'wuban-english-v21';
+const CACHE = 'wuban-english-v22';
 /* 语音单独一个缓存，版本升级时不清空，省流量。
    v2：改为加密音频；地址带 ?k=密钥编号，管理员更换主密钥后自动换成新文件 */
 const AUDIO_CACHE = 'wuban-audio-v2';
@@ -47,26 +47,31 @@ self.addEventListener('fetch', e=>{
     return;
   }
 
-  /* 邀请码钥匙表：联网优先——管理员作废某个码后要尽快生效；离线时用缓存 */
+  /* 邀请码钥匙表：联网优先——管理员作废某个码后要尽快生效；
+     但最多等 4 秒，超时或离线就用缓存，不再让页面干等 */
   if(/\/keys\.json$/.test(url.pathname)){
     e.respondWith(
-      fetch(req,{cache:'no-cache'}).then(resp=>{
+      Promise.race([
+        fetch(req,{cache:'no-cache'}),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),4000))
+      ]).then(resp=>{
         if(resp.ok){ const copy=resp.clone(); caches.open(CACHE).then(c=>c.put('./keys.json',copy)).catch(()=>{}); }
         return resp;
-      }).catch(()=> caches.match('./keys.json'))
+      }).catch(()=> caches.match('./keys.json').then(r=>r||Response.error()))
     );
     return;
   }
 
-  /* 页面导航：优先联网取最新版本，离线时回退到缓存的 index.html */
+  /* 页面导航：缓存优先（秒开），同时后台取最新版本，下次打开生效；没有缓存才等网络 */
   if(req.mode==='navigate'){
-    e.respondWith(
-      fetch(req).then(resp=>{
-        const copy=resp.clone();
-        caches.open(CACHE).then(c=>c.put('./index.html',copy)).catch(()=>{});
+    e.respondWith(caches.match('./index.html').then(cached=>{
+      const net = fetch(req).then(resp=>{
+        if(resp && resp.ok){ const copy=resp.clone(); caches.open(CACHE).then(c=>c.put('./index.html',copy)).catch(()=>{}); }
         return resp;
-      }).catch(()=> caches.match('./index.html').then(r=>r || caches.match('./')))
-    );
+      }).catch(()=>null);
+      if(cached){ e.waitUntil(net); return cached; }
+      return net.then(r=> r || caches.match('./') .then(x=>x||Response.error()));
+    }));
     return;
   }
 
@@ -74,14 +79,16 @@ self.addEventListener('fetch', e=>{
      同时后台联网刷新缓存，下次打开自动用上最新内容 */
   e.respondWith(
     caches.match(req).then(cached=>{
-      const network = fetch(req,{cache:'no-cache'}).then(resp=>{
+      /* 有缓存时把后台刷新推迟 2.5 秒，让出带宽给首屏；没有缓存就立刻取 */
+      const network = new Promise(r=>setTimeout(r, cached?2500:0)).then(()=>fetch(req,{cache:'no-cache'})).then(resp=>{
         if(resp && resp.ok){
           const copy=resp.clone();
           caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
         }
         return resp;
       }).catch(()=>cached);
-      return cached || network;
+      if(cached){ e.waitUntil(network); return cached; }
+      return network;
     })
   );
 });
