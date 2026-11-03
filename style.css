@@ -819,3 +819,7 @@ body{padding-bottom:calc(190rem + env(safe-area-inset-bottom));}
 .phrase-a{font-size:20px;font-weight:700;line-height:1.5;color:var(--navy-900);margin-top:6rem;}
 .phrase-cn{font-size:15px;color:var(--muted);margin-top:14rem;line-height:1.6;}
 .flash-reveal .flash-play{margin-top:22rem;}
+.free-card{position:relative;}
+.free-more{position:absolute;top:22rem;right:22rem;font-size:11px;font-weight:650;color:var(--navy-800);padding:8rem 18rem;border-radius:999px;
+  background:rgba(255,255,255,.75);border:1rem solid var(--glass-line);box-shadow:var(--glass-hi);}
+.free-more:active{opacity:.6;}

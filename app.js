@@ -293,15 +293,17 @@ function renderHome(){
     </div>
 
     <div class="section" style="margin-top:34rem">
-      <div class="section-head"><div class="section-head-left"><span class="section-title">自由学习</span></div><span class="section-sub">不闯关，随时背</span></div>
+      <div class="section-head"><div class="section-head-left"><span class="section-title">自由学习</span></div><span class="section-sub">点卡片直接开始</span></div>
       <div class="free-row">
-        <div class="free-card" onclick="openFreeWords()">
+        <div class="free-card" onclick="quickWords()">
+          <span class="free-more" onclick="event.stopPropagation();openFreeWords()">分类</span>
           <div class="free-ic t-green">${icon('book')}</div>
           <div class="free-name">背单词</div>
           <div class="free-meta">已学 ${studied} / ${WORDS.length}</div>
           <div class="free-bar"><i style="width:${WORDS.length?Math.min(100,Math.round(studied/WORDS.length*100)):0}%"></i></div>
         </div>
-        <div class="free-card" onclick="openFreePhrases()">
+        <div class="free-card" onclick="quickPhrases()">
+          <span class="free-more" onclick="event.stopPropagation();openFreePhrases()">分类</span>
           <div class="free-ic t-blue">${icon('talk')}</div>
           <div class="free-name">背短语</div>
           <div class="free-meta">已学 ${phraseStudied} / ${phraseTotal}</div>
@@ -474,6 +476,21 @@ function finishWords(){ toast('本组学习完成'); goBack(); }
 function allPhrases(){ const r=[]; SPEAKING.forEach(c=>c.list.forEach(it=>r.push({en:it.en,cn:it.cn,cat:c.category}))); return r; }
 let phraseSession=null;
 function phraseDir(){ return LS.get('phraseDir','cn2en'); }
+function quickWords(){
+  const done=new Set(LS.get('studiedWords',[]));
+  const list=[...shuffle(WORDS.filter(w=>!done.has(w.word))),...shuffle(WORDS.filter(w=>done.has(w.word)))];
+  if(!list.length){ toast('暂无单词'); return; }
+  wordSession={list,idx:0,revealed:false,mode:'study',cat:'背单词'};
+  navigate(renderFlash,'背单词','');
+}
+function quickPhrases(){
+  const done=new Set(LS.get('studiedPhrases',[])), all=allPhrases();
+  const list=[...shuffle(all.filter(p=>!done.has(p.en))),...shuffle(all.filter(p=>done.has(p.en)))];
+  if(!list.length){ toast('暂无短语'); return; }
+  phraseSession={list,idx:0,revealed:false,mode:'study',cat:'背短语'};
+  navigate(renderPhraseFlash,'背短语','');
+  if(phraseDir()==='en2cn') setTimeout(()=>speak(list[0].en),0);
+}
 function openFreeWords(){ navigate(renderWordsMenu,'背单词',''); }
 function openFreePhrases(){ navigate(renderPhraseMenu,'背短语',''); }
 function setPhraseDir(d){ LS.set('phraseDir',d); refresh(); }
