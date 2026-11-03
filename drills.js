@@ -142,6 +142,7 @@ function renderDrillScene(){
           <div class="li-en speakable" onclick="speak(${jsAttr(l.en)})">${esc(l.en)}</div>
           <div class="li-cn">${esc(l.cn)}</div>
         </div>
+        ${lineActs(l.en, l.cn)}
         <div class="play" ${pb(l.en)}>${PI}</div>
       </div>`;
     });
@@ -215,6 +216,7 @@ function renderDrillPractice(){
     </div>`;
   }
   html += `</div>`;
+  if(st.revealed) html += lineTools(l.en, l.cn);
   if(!st.revealed){
     html += `<button class="btn gold" onclick="revealDrill()">${cn2en ? '我说完了，看答案' : '我想好了，看答案'}</button>`;
   } else {

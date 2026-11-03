@@ -279,6 +279,7 @@ function renderHome(){
   return `
   <div class="view">
     ${installBannerHtml()}
+    <div class="search-pill" onclick="openSearch()">${icon('search')}<span>执勤速查 · 输入中文或英文，一秒找到整句</span></div>
     <div class="welcome-card">
       <div class="welcome-top">
         <div class="welcome-user">
@@ -357,6 +358,11 @@ function renderHome(){
         <div class="func-item" onclick="openReview()">
           <div class="func-icon t-green">${icon('star')}</div>
           <div class="func-info"><span class="func-name">生词本</span><span class="func-desc">错词和不熟的词集中复习</span></div><span class="func-arrow">›</span>
+        </div>
+        <div class="func-divider"></div>
+        <div class="func-item" onclick="openFavs()">
+          <div class="func-icon t-violet">${icon('star')}</div>
+          <div class="func-info"><span class="func-name">我的收藏</span><span class="func-desc">常用整句，一键放大给旅客看</span></div><span class="func-arrow">›</span>
         </div>
         <div class="func-divider"></div>
         <div class="func-item" onclick="openChat()">
@@ -576,6 +582,7 @@ function renderPhraseFlash(){
     <div class="progress-txt"><span>${s.idx+1} / ${s.list.length}</span><span>${esc(s.cat)}</span></div>
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
     <div class="flash" onclick="revealPhrase()">${face}</div>
+    ${s.revealed?lineTools(p.en,p.cn):''}
     <div class="flash-actions">
       ${review
         ? `<button class="btn ghost" onclick="removeWrongPhrase()">已掌握 · 移除</button><button class="btn gold" onclick="nextPhrase()">下一个 ›</button>`
@@ -628,7 +635,7 @@ function openSpeakCat(i){
     let html=`<div class="view">`;
     c.list.forEach(it=>{ html+=`<div class="list-item">
       <div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div>
-      <div class="play" ${pb(it.en)}>${PI}</div></div>`; });
+      ${lineActs(it.en,it.cn)}<div class="play" ${pb(it.en)}>${PI}</div></div>`; });
     return html+'<div class="safe"></div></div>';
   }, c.category, '');
 }
@@ -791,7 +798,7 @@ function openSecCat(pi,ci){
           ${it.a&&(it.a.en||it.a.cn)?`<div class="qa-a"><div class="qa-badge a">A</div><div class="li-main"><div class="li-en${it.a.en?' speakable':''}" ${it.a.en?`onclick="speak(${jsAttr(it.a.en)})"`:''}>${esc(it.a.en)}</div><div class="li-cn">${esc(it.a.cn)}</div></div>${it.a.en?`<div class="play" ${pb(it.a.en)}>${PI}</div>`:''}</div>`:''}
         </div>`;
       } else {
-        html+=`<div class="list-item"><div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div><div class="play" ${pb(it.en)}>${PI}</div></div>`;
+        html+=`<div class="list-item"><div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${esc(it.en)}</div><div class="li-cn">${esc(it.cn)}</div></div>${lineActs(it.en,it.cn)}<div class="play" ${pb(it.en)}>${PI}</div></div>`;
       }
     });
     return html+'<div class="safe"></div></div>';

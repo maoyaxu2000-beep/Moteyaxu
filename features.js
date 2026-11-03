@@ -240,3 +240,188 @@ function renderSrsSummary(){
 function srsExit(){ srsSession = null; goBack(); }
 
 srsSeedOnce();
+
+/* =========================================================
+   2. 收藏 · 执勤速查 · 给旅客看
+========================================================= */
+/* ---------- 收藏：以英文原句的哈希为 key，内容一起存下来，不依赖词库顺序 ---------- */
+function favKey(en){ return audioKey(en); }
+function favList(){ return LS.get('favs', []); }
+function isFav(en){ const k = favKey(en); return favList().some(f => f.k === k); }
+function lnData(en, cn){ return `data-en="${esc(en)}" data-cn="${esc(cn || '')}"`; }
+function favBtn(en, cn){
+  return `<span class="ln-btn fav${isFav(en) ? ' on' : ''}" data-fk="${favKey(en)}" ${lnData(en, cn)} role="button" aria-label="收藏" onclick="event.stopPropagation();toggleFav(this)">${icon('star')}</span>`;
+}
+function showBtn(en, cn){
+  return `<span class="ln-btn" ${lnData(en, cn)} role="button" aria-label="给旅客看" onclick="event.stopPropagation();showCardEl(this)">${icon('expand')}</span>`;
+}
+/* 列表行右侧的两个小图标：收藏、给旅客看 */
+function lineActs(en, cn){ return `<div class="ln-acts">${favBtn(en, cn)}${showBtn(en, cn)}</div>`; }
+/* 闪卡下方的一排文字按钮 */
+function lineTools(en, cn){
+  const on = isFav(en);
+  return `<div class="line-tools">
+    <span class="lt-btn fav${on ? ' on' : ''}" data-fk="${favKey(en)}" ${lnData(en, cn)} role="button" onclick="toggleFav(this)">${icon('star')}<i>收藏</i></span>
+    <span class="lt-btn" ${lnData(en, cn)} role="button" onclick="showCardEl(this)">${icon('expand')}<i>给旅客看</i></span>
+    ${typeof recToolBtn === 'function' ? recToolBtn(en) : ''}
+  </div>`;
+}
+function toggleFav(el){
+  const en = el.dataset.en, cn = el.dataset.cn, k = favKey(en);
+  const a = favList(), i = a.findIndex(f => f.k === k);
+  if(i >= 0){ a.splice(i, 1); toast('已取消收藏'); }
+  else { a.unshift({ k, en, cn, t: Date.now() }); toast('已收藏'); }
+  LS.set('favs', a);
+  document.querySelectorAll(`[data-fk="${k}"]`).forEach(e => e.classList.toggle('on', i < 0));
+}
+
+function openFavs(){ navigate(renderFavs, '我的收藏', ''); }
+function renderFavs(){
+  const a = favList();
+  if(!a.length) return `<div class="view"><div class="empty"><span class="big">${icon('star')}</span>还没有收藏<br><span style="font-size:12px">在任意句子右侧点 ☆ 就能收藏，执勤时一翻就找到</span></div></div>`;
+  return `<div class="view">
+    <div class="fav-head"><span>共 ${a.length} 句</span><button class="chip" onclick="startFavPractice()">练习收藏</button></div>
+    ${a.map(f => `<div class="list-item">
+      <div class="li-main"><div class="li-en speakable" onclick="speak(${jsAttr(f.en)})">${esc(f.en)}</div><div class="li-cn">${esc(f.cn)}</div></div>
+      ${lineActs(f.en, f.cn)}<div class="play" ${pb(f.en)}>${PI}</div></div>`).join('')}
+    <div class="safe"></div></div>`;
+}
+function startFavPractice(){
+  const a = favList(); if(!a.length) return;
+  phraseSession = { list: shuffle(a.map(f => ({ en: f.en, cn: f.cn, cat: '我的收藏' }))), idx: 0, revealed: false, mode: 'study', cat: '我的收藏' };
+  navigate(renderPhraseFlash, '练习收藏', '');
+  if(phraseDir() === 'en2cn') setTimeout(() => speak(phraseSession.list[0].en), 0);
+}
+
+/* ---------- 给旅客看：全屏大字卡 ---------- */
+let _wake = null;
+function showCardEl(el){ showCard(el.dataset.en, el.dataset.cn); }
+function showCard(en, cn){
+  closeShowCard();
+  const n = en.length, vw = n <= 14 ? 15 : n <= 28 ? 11 : n <= 50 ? 8.5 : n <= 90 ? 6.5 : 5;
+  const d = document.createElement('div');
+  d.id = 'showCard'; d.className = 'show-card';
+  d.innerHTML = `<button class="sc-close" onclick="closeShowCard()" aria-label="关闭">${icon('close')}</button>
+    <div class="sc-body">
+      <div class="sc-en" style="font-size:min(${vw}vw,${(vw * 1.25).toFixed(1)}vh)">${esc(en)}</div>
+      <div class="sc-cn" id="scCn">${esc(cn || '')}</div>
+    </div>
+    <div class="sc-bar">
+      <button class="sc-btn" ${pb(en)}>${PI}<span>播放</span></button>
+      ${cn ? `<button class="sc-btn ghost" onclick="scToggleCn(this)"><span>仅英文</span></button>` : ''}
+    </div>`;
+  document.body.appendChild(d);
+  document.body.classList.add('sc-open');
+  markPlaying();
+  try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { _wake = l; }).catch(() => {}); }catch(e){}
+}
+function scToggleCn(btn){
+  const cn = document.getElementById('scCn'); if(!cn) return;
+  const hide = cn.classList.toggle('off');
+  btn.querySelector('span').textContent = hide ? '显示中文' : '仅英文';
+}
+function closeShowCard(){
+  const d = document.getElementById('showCard'); if(!d) return;
+  d.remove(); document.body.classList.remove('sc-open');
+  stopSpeak();
+  try{ if(_wake){ _wake.release(); _wake = null; } }catch(e){}
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeShowCard(); });
+
+/* ---------- 执勤速查：全库搜索（单词 / 短语 / 空保英语 / 处置口语 / 对话） ---------- */
+let _corpus = null;
+function searchCorpus(){
+  if(_corpus) return _corpus;
+  const out = [], seen = new Set();
+  const push = (en, cn, src, o) => {
+    if(!en) return; o = o || {};
+    if(!o.word){ const k = en.trim().toLowerCase(); if(seen.has(k)) return; seen.add(k); }
+    out.push({ en, cn: cn || '', src, ph: o.ph || '', eg: o.eg || '',
+      h: (en + ' ' + (cn || '') + ' ' + (o.eg || '') + ' ' + (o.egCn || '')).toLowerCase(), word: !!o.word });
+  };
+  WORDS.forEach(w => push(w.word, w.meaning, '单词', { word: 1, ph: w.phonetic, eg: w.example, egCn: w.exampleCn }));
+  SPEAKING.forEach(c => c.list.forEach(it => push(it.en, it.cn, '短语 · ' + c.category)));
+  (window.DATA.security || []).forEach(p => p.categories.forEach(c => c.items.forEach(it => {
+    if(it.en) push(it.en, it.cn, '空保英语 · ' + c.category);
+    if(it.q) push(it.q.en, it.q.cn, '空保英语 · ' + c.category);
+    if(it.a && it.a.en) push(it.a.en, it.a.cn, '空保英语 · ' + c.category);
+    (it.turns || []).forEach(t => push(t.en, t.cn, '空保英语 · ' + c.category));
+  })));
+  (window.DATA.dialogues || []).forEach(c => c.list.forEach(d => d.dialogue.forEach(t => push(t.text || t.en, t.textCn || t.cn, '对话 · ' + d.title))));
+  ((window.DATA && window.DATA.drills) || []).forEach(c => c.scenes.forEach(s => s.groups.forEach(g => g.lines.forEach(l => push(l.en, l.cn, '处置口语 · ' + s.title)))));
+  return (_corpus = out);
+}
+function searchRun(q){
+  const ql = q.trim().toLowerCase(), terms = ql.split(/\s+/).filter(Boolean);
+  if(!terms.length) return { terms, total: 0, list: [] };
+  const res = [];
+  for(const it of searchCorpus()){
+    if(!terms.every(t => it.h.includes(t))) continue;
+    const en = it.en.toLowerCase(); let sc = 10;
+    if(en === ql) sc = 100; else if(en.startsWith(terms[0])) sc = 60; else if(en.includes(terms[0])) sc = 40; else if(it.cn.includes(terms[0])) sc = 30;
+    if(it.word) sc += 3;
+    res.push([sc, it]);
+  }
+  res.sort((a, b) => b[0] - a[0]);
+  return { terms, total: res.length, list: res.slice(0, 40).map(x => x[1]) };
+}
+/* 把命中的关键词标出来（先按原文切分再转义，不会误伤 &amp; 之类的实体） */
+function hl(text, terms){
+  if(!terms.length) return esc(text);
+  const re = new RegExp('(' + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'ig');
+  return String(text).split(re).map((seg, i) => i % 2 ? `<mark>${esc(seg)}</mark>` : esc(seg)).join('');
+}
+const SEARCH_HOT = ['安全带', '手机', '行李', '护照', '登机牌', '冷静', '醉酒', '座位', '证件', '紧急'];
+function openSearch(){
+  navigate(renderSearch, '执勤速查', '');
+  const tb = document.getElementById('topbar');
+  document.documentElement.style.setProperty('--tbh', (tb ? tb.offsetHeight : 48) + 'px');
+  setTimeout(() => { const i = document.getElementById('sIn'); if(i) i.focus(); }, 60);
+}
+function renderSearch(){
+  return `<div class="view">
+    <div class="search-bar">${icon('search')}<input id="sIn" type="search" placeholder="输入中文或英文，如「安全带」「passport」" autocomplete="off" autocapitalize="off" spellcheck="false"
+      oninput="searchInput(event)" oncompositionend="searchInput(event)" onkeydown="if(event.key==='Enter'){searchRemember();this.blur()}">
+      <span class="sb-clear" onclick="searchClear()" aria-label="清空">${icon('close')}</span></div>
+    <div id="sRes">${searchIdle()}</div>
+    <div class="safe"></div></div>`;
+}
+function searchIdle(){
+  const rec = LS.get('recentSearch', []);
+  const chip = q => `<span class="chip" onclick="searchFill(${jsAttr(q)})">${esc(q)}</span>`;
+  return `${rec.length ? `<div class="sr-title">最近查过 <span onclick="searchClearRecent()">清除</span></div><div class="sr-chips">${rec.map(chip).join('')}</div>` : ''}
+    <div class="sr-title">常用速查</div><div class="sr-chips">${SEARCH_HOT.map(chip).join('')}</div>
+    <div class="sr-tip">支持中文、英文、中英混合；多个词用空格隔开。点 <b>⛶</b> 把整句放大给旅客看，点 <b>☆</b> 收藏。</div>`;
+}
+let _sTimer = null;
+function searchInput(e){
+  if(e.isComposing) return;
+  clearTimeout(_sTimer);
+  const v = e.target.value;
+  _sTimer = setTimeout(() => searchRender(v), 90);
+}
+function searchRender(v){
+  const box = document.getElementById('sRes'); if(!box) return;
+  const r = searchRun(v);
+  if(!r.terms.length){ box.innerHTML = searchIdle(); return; }
+  if(!r.list.length){ box.innerHTML = `<div class="empty" style="padding:60rem 0"><span class="big">${icon('search')}</span>没有找到「${esc(v)}」<br><span style="font-size:12px">换个说法试试，或只输入一个关键词</span></div>`; return; }
+  box.innerHTML = (r.total > r.list.length ? `<div class="sr-title">找到 ${r.total} 条，显示前 ${r.list.length} 条</div>` : `<div class="sr-title">找到 ${r.total} 条</div>`)
+    + r.list.map(it => `<div class="list-item sr-item">
+      <div class="li-main">
+        <div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${hl(it.en, r.terms)}${it.ph ? ` <span class="sr-ph">${esc(it.ph)}</span>` : ''}</div>
+        <div class="li-cn">${hl(it.cn, r.terms)}</div>
+        ${it.eg ? `<div class="sr-eg">${hl(it.eg, r.terms)}</div>` : ''}
+        <div class="sr-src">${esc(it.src)}</div>
+      </div>
+      ${lineActs(it.en, it.cn)}<div class="play" ${pb(it.en)}>${PI}</div></div>`).join('');
+  markPlaying();
+}
+function searchRemember(){
+  const i = document.getElementById('sIn'); if(!i) return;
+  const v = i.value.trim(); if(!v || !searchRun(v).list.length) return;
+  const rec = LS.get('recentSearch', []).filter(x => x !== v); rec.unshift(v);
+  LS.set('recentSearch', rec.slice(0, 8));
+}
+function searchFill(q){ const i = document.getElementById('sIn'); if(!i) return; i.value = q; searchRender(q); searchRemember(); }
+function searchClear(){ const i = document.getElementById('sIn'); if(!i) return; i.value = ''; searchRender(''); i.focus(); }
+function searchClearRecent(){ LS.set('recentSearch', []); const i = document.getElementById('sIn'); searchRender(i ? i.value : ''); }
