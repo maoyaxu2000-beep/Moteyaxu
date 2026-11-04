@@ -347,14 +347,51 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape') closeShowCard
 
 /* ---------- 执勤速查：全库搜索（单词 / 短语 / 空保英语 / 处置口语 / 对话） ---------- */
 let _corpus = null;
+/* ---- 文本规整：小写、去标点（don't → dont）、多空格合一 ---- */
+let _punct;
+try{ _punct = new RegExp('[^\\p{L}\\p{N}]+', 'gu'); }catch(e){ _punct = /[^a-z0-9㐀-鿿]+/g; }   // 老内核不支持 \p 时退回基本写法
+function sNorm(t){ return String(t || '').toLowerCase().replace(/['’‘`]/g, '').replace(_punct, ' ').trim(); }
+const S_CJK = /[㐀-鿿]/;
+/* 词干：去掉常见词尾（复数、-ing、-ed），让 passports / boarding 也能找到 passport / board */
+function sStem(w){
+  if(w.length > 4){
+    if(w.endsWith('ies')) return w.slice(0, -3) + 'y';
+    if(w.endsWith('ing')) return w.slice(0, -3);
+    if(w.endsWith('ed') || w.endsWith('es')) return w.slice(0, -2);
+  }
+  return (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) ? w.slice(0, -1) : w;
+}
+function sSameStem(a, b){ return a === b || (Math.min(a.length, b.length) >= 4 && Math.abs(a.length - b.length) <= 2 && (a.startsWith(b) || b.startsWith(a))); }
+/* 相差不超过 1 个字母（错一个、多一个、少一个） */
+function sNear1(a, b){
+  const d = a.length - b.length; if(d > 1 || d < -1) return false;
+  if(a.length < b.length){ const t = a; a = b; b = t; }
+  let i = 0, j = 0, diff = 0;
+  while(i < a.length && j < b.length){
+    if(a[i] === b[j]){ i++; j++; continue; }
+    if(++diff > 1) return false;
+    if(a.length === b.length){ i++; j++; } else i++;
+  }
+  return diff + (a.length - i) + (b.length - j) <= 1;
+}
+/* 释义里「n. 安全带；座椅安全带」这种，按分号 / 逗号拆开并去掉词性前缀，方便整词精确匹配 */
+function sSegs(cn){
+  return String(cn || '').split(/[；;，,、\/（）()]/).map(x => sNorm(x.replace(/^\s*(?:n|v|vt|vi|adj|adv|prep|conj|pron|num|int|abbr)\.?\s*/i, ''))).filter(Boolean);
+}
+function searchMake(en, cn, src, o){
+  o = o || {};
+  const n = sNorm(en), ew = n.split(' ').filter(Boolean);
+  return { en, cn: cn || '', src, ph: o.ph || '', eg: o.eg || '', word: !!o.word,
+    n, ew, es: ew.map(sStem), nsq: n.replace(/ /g, ''),
+    c: sNorm(cn), cs: sSegs(cn), e: sNorm(o.eg), ec: sNorm(o.egCn) };
+}
 function searchCorpus(){
   if(_corpus) return _corpus;
   const out = [], seen = new Set();
   const push = (en, cn, src, o) => {
     if(!en) return; o = o || {};
     if(!o.word){ const k = en.trim().toLowerCase(); if(seen.has(k)) return; seen.add(k); }
-    out.push({ en, cn: cn || '', src, ph: o.ph || '', eg: o.eg || '',
-      h: (en + ' ' + (cn || '') + ' ' + (o.eg || '') + ' ' + (o.egCn || '')).toLowerCase(), word: !!o.word });
+    out.push(searchMake(en, cn, src, o));
   };
   WORDS.forEach(w => push(w.word, w.meaning, '单词', { word: 1, ph: w.phonetic, eg: w.example, egCn: w.exampleCn }));
   SPEAKING.forEach(c => c.list.forEach(it => push(it.en, it.cn, '短语 · ' + c.category)));
@@ -368,20 +405,91 @@ function searchCorpus(){
   ((window.DATA && window.DATA.drills) || []).forEach(c => c.scenes.forEach(s => s.groups.forEach(g => g.lines.forEach(l => push(l.en, l.cn, '处置口语 · ' + s.title)))));
   return (_corpus = out);
 }
-function searchRun(q){
-  const ql = q.trim().toLowerCase(), terms = ql.split(/\s+/).filter(Boolean);
-  if(!terms.length) return { terms, total: 0, list: [] };
-  const res = [];
-  for(const it of searchCorpus()){
-    if(!terms.every(t => it.h.includes(t))) continue;
-    const en = it.en.toLowerCase(); let sc = 10;
-    if(en === ql) sc = 100; else if(en.startsWith(terms[0])) sc = 60; else if(en.includes(terms[0])) sc = 40; else if(it.cn.includes(terms[0])) sc = 30;
-    if(it.word) sc += 3;
-    res.push([sc, it]);
-  }
-  res.sort((a, b) => b[0] - a[0]);
-  return { terms, total: res.length, list: res.slice(0, 40).map(x => x[1]) };
+
+/* 短的英文词（id、no）要整词命中，否则 provide 里的 id 也算 */
+function sHas(text, t){ return (t.length >= 3 || S_CJK.test(t)) ? text.includes(t) : (' ' + text + ' ').includes(' ' + t + ' '); }
+/* ---- 第一档：每个词都要命中（整词 > 开头 > 包含 > 例句里出现），分数越高越靠前 ---- */
+function sTokenScore(it, t){
+  if(it.n === t || it.c === t) return 100;
+  if(it.cs.includes(t)) return 92;                                   // 释义整条就是它：搜「安全带」先出单词「seat belt」
+  if(it.c.startsWith(t)) return 74;
+  if(it.ew.includes(t)) return 72;
+  if(it.c.includes(t)) return 56;
+  if(it.ew.some(w => w.startsWith(t))) return 56;
+  if(t.length >= 4 && it.nsq.includes(t)) return 44;                 // seatbelt ↔ seat belt
+  if(t.length >= 3 && it.n.includes(t)) return 36;
+  if(sHas(it.e, t) || sHas(it.ec, t)) return 14;              // 只在例句里出现
+  return 0;
 }
+function sStrict(it, terms, qn, qsq){
+  let sum = 0, bonus = 0;
+  for(const t of terms){
+    const sc = sTokenScore(it, t); if(!sc) return 0;
+    sum += sc;
+    if(sc >= 36) bonus += 14 * t.length / Math.max(t.length, S_CJK.test(t) ? it.c.length : it.n.length);   // 越短越贴近
+  }
+  let r = sum / terms.length + bonus / terms.length;
+  if(terms.length > 1 && (qn === it.n || qn === it.c || qsq === it.nsq)) r += 40;
+  return r + (it.word ? 2 : 0);
+}
+
+/* ---- 第二档（相近结果）：整句描述、错别字、单复数 —— 不要求每个词都命中，按命中比例排序 ---- */
+const S_EN_STOP = new Set('a an the to of in on at for and or is are am be do does did not no you your me my i it this that please can could would will we us with from by as if so'.split(' '));
+const S_CN_PHRASE = /怎么说|怎么讲|怎么表达|怎么写|如何说|如何表达|用英语怎么说|用英文怎么说|英语怎么说|英文怎么说|是什么意思|什么意思|是什么/g;
+function sLooseQuery(q){
+  const toks = sNorm(q).split(' ').filter(Boolean);
+  const cn = [], lt = [];
+  toks.forEach(t => {
+    if(!S_CJK.test(t)){ lt.push(t); return; }
+    const m = t.match(/[㐀-鿿]+|[a-z0-9]+/g) || [];
+    m.forEach(seg => {
+      if(!S_CJK.test(seg)){ lt.push(seg); return; }
+      let x = seg.replace(S_CN_PHRASE, ' ');
+      if(x.replace(/\s/g, '').length > 4) x = x.replace(/[的了吗呢吧啊呀嘛请我你您]/g, ' ');       // 长句里去掉语气词，短词保持原样
+      x.split(/\s+/).filter(Boolean).forEach(p => {
+        if(p.length === 1) cn.push(p);
+        else for(let i = 0; i < p.length - 1; i++) cn.push(p.slice(i, i + 2));
+      });
+    });
+  });
+  const bg = [...new Set(cn)];
+  let words = [...new Set(lt)];
+  const kept = words.filter(w => !S_EN_STOP.has(w)); if(kept.length) words = kept;
+  return { bg, lt: words, st: words.map(sStem) };
+}
+function sLoose(it, q){
+  const tot = q.bg.length + q.lt.length; if(!tot) return 0;
+  let hit = 0;
+  q.bg.forEach(b => { if(it.c.includes(b) || it.ec.includes(b)) hit++; });
+  q.lt.forEach((w, i) => {
+    const st = q.st[i];
+    if(it.es.some(x => sSameStem(x, st)) || it.nsq.includes(w) && w.length >= 4) hit++;
+    else if(w.length >= 5 && it.ew.some(x => sNear1(x, w))) hit++;
+  });
+  if(!hit) return 0;
+  if(tot >= 3 && hit < 2) return 0;
+  const ratio = hit / tot;
+  return (ratio >= 0.3 || hit >= 3) ? ratio : 0;
+}
+
+function searchRunOn(corpus, q){
+  const qn = sNorm(q), terms = qn.split(' ').filter(Boolean);
+  if(!terms.length) return { terms, total: 0, list: [], loose: [], looseTerms: [] };
+  const qsq = qn.replace(/ /g, ''), res = [];
+  corpus.forEach((it, idx) => { const sc = sStrict(it, terms, qn, qsq); if(sc) res.push([sc, idx, it]); });
+  res.sort((a, b) => b[0] - a[0] || a[2].en.length - b[2].en.length || a[1] - b[1]);
+  const out = { terms, total: res.length, list: res.slice(0, 40).map(x => x[2]), loose: [], looseTerms: [] };
+  if(res.length < 5){
+    const lq = sLooseQuery(q), got = new Set(out.list), cand = [];
+    corpus.forEach((it, idx) => { if(got.has(it)) return; const r = sLoose(it, lq); if(r) cand.push([r, idx, it]); });
+    cand.sort((a, b) => b[0] - a[0] || a[2].en.length - b[2].en.length || a[1] - b[1]);
+    out.loose = cand.slice(0, 12).map(x => x[2]);
+    out.looseTerms = lq.bg; out.lq = lq;
+  }
+  return out;
+}
+function searchRun(q){ return searchRunOn(searchCorpus(), q); }
+
 /* 把命中的关键词标出来（先按原文切分再转义，不会误伤 &amp; 之类的实体） */
 function hl(text, terms){
   if(!terms.length) return esc(text);
@@ -417,25 +525,36 @@ function searchInput(e){
   const v = e.target.value;
   _sTimer = setTimeout(() => searchRender(v), 90);
 }
+/* 相近结果里，把这一条里「被认作同一个词」的单词也标出来（pasport → passport） */
+function searchLooseMarks(it, r){
+  const lq = r.lq; if(!lq || !lq.lt.length) return r.looseTerms;
+  const ws = it.ew.filter(x => lq.st.some(st => sSameStem(sStem(x), st)) || lq.lt.some(w => w.length >= 5 && sNear1(x, w)));
+  return r.looseTerms.concat(ws);
+}
+function searchRow(it, terms){
+  return `<div class="list-item sr-item">
+      <div class="li-main">
+        <div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${hl(it.en, terms)}${it.ph ? ` <span class="sr-ph">${esc(it.ph)}</span>` : ''}</div>
+        <div class="li-cn">${hl(it.cn, terms)}</div>
+        ${it.eg ? `<div class="sr-eg">${hl(it.eg, terms)}</div>` : ''}
+        <div class="sr-src">${esc(it.src)}</div>
+      </div>
+      ${lineActs(it.en, it.cn)}<div class="play" ${pb(it.en)}>${PI}</div></div>`;
+}
 function searchRender(v){
   const box = document.getElementById('sRes'); if(!box) return;
   const r = searchRun(v);
   if(!r.terms.length){ box.innerHTML = searchIdle(); return; }
-  if(!r.list.length){ box.innerHTML = `<div class="empty" style="padding:60rem 0"><span class="big">${icon('search')}</span>没有找到「${esc(v)}」<br><span style="font-size:12px">换个说法试试，或只输入一个关键词</span></div>`; return; }
-  box.innerHTML = (r.total > r.list.length ? `<div class="sr-title">找到 ${r.total} 条，显示前 ${r.list.length} 条</div>` : `<div class="sr-title">找到 ${r.total} 条</div>`)
-    + r.list.map(it => `<div class="list-item sr-item">
-      <div class="li-main">
-        <div class="li-en speakable" onclick="speak(${jsAttr(it.en)})">${hl(it.en, r.terms)}${it.ph ? ` <span class="sr-ph">${esc(it.ph)}</span>` : ''}</div>
-        <div class="li-cn">${hl(it.cn, r.terms)}</div>
-        ${it.eg ? `<div class="sr-eg">${hl(it.eg, r.terms)}</div>` : ''}
-        <div class="sr-src">${esc(it.src)}</div>
-      </div>
-      ${lineActs(it.en, it.cn)}<div class="play" ${pb(it.en)}>${PI}</div></div>`).join('');
+  if(!r.list.length && !r.loose.length){ box.innerHTML = `<div class="empty" style="padding:60rem 0"><span class="big">${icon('search')}</span>没有找到「${esc(v)}」<br><span style="font-size:12px">换个说法试试，或只输入一个关键词</span></div>`; return; }
+  let html = '';
+  if(r.list.length) html += (r.total > r.list.length ? `<div class="sr-title">找到 ${r.total} 条，显示前 ${r.list.length} 条</div>` : `<div class="sr-title">找到 ${r.total} 条</div>`) + r.list.map(it => searchRow(it, r.terms)).join('');
+  if(r.loose.length) html += `<div class="sr-title">${r.list.length ? '相近的结果' : '没有完全一致的，下面是意思相近的'}</div>` + r.loose.map(it => searchRow(it, searchLooseMarks(it, r))).join('');
+  box.innerHTML = html;
   markPlaying();
 }
 function searchRemember(){
   const i = document.getElementById('sIn'); if(!i) return;
-  const v = i.value.trim(); if(!v || !searchRun(v).list.length) return;
+  const v = i.value.trim(); if(!v) return; const rr = searchRun(v); if(!rr.list.length && !rr.loose.length) return;
   const rec = LS.get('recentSearch', []).filter(x => x !== v); rec.unshift(v);
   LS.set('recentSearch', rec.slice(0, 8));
 }

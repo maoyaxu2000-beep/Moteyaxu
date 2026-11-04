@@ -94,7 +94,7 @@ const { serve, launch, check, done } = require('./lib');
   check('英文搜索命中短语', await page.locator('.sr-item .li-en').first().innerText() === 'Please fasten your seat belt.');
   check('命中词高亮', await page.locator('.sr-item mark').count() >= 2);
   await page.fill('#sIn', '手机');
-  await page.waitForFunction(() => document.querySelectorAll('.sr-item').length >= 2);
+  await page.waitForFunction(() => [...document.querySelectorAll('.sr-item .li-en')].filter(e => /phone/i.test(e.innerText)).length >= 2);
   const hits = await page.locator('.sr-item .li-en').allInnerTexts();
   check('中文搜索命中短语与处置句', hits.includes('Turn off your phone, please.') && hits.includes('Sir, please turn off your phone.'), hits);
   await page.fill('#sIn', 'word1');
@@ -106,6 +106,41 @@ const { serve, launch, check, done } = require('./lib');
   await page.fill('#sIn', 'passport'); await page.keyboard.press('Enter');
   check('回车后记入最近查过', await ev(() => LS.get('recentSearch', []).includes('passport')));
   await ev(() => goBack());
+
+  console.log('· 速查排序与容错');
+  const S = await ev(() => {
+    const mk = (en, cn, src, o) => searchMake(en, cn, src, o);
+    window.__corp = [
+      mk('provide', '提供', '单词', { word: 1, eg: 'We provide help', egCn: '我们提供帮助' }),
+      mk('seat belt', 'n. 安全带；座椅安全带', '单词', { word: 1, eg: 'Fasten your seat belt.', egCn: '请系好安全带。' }),
+      mk('passport', '护照', '单词', { word: 1, eg: 'Show your passport.', egCn: '出示护照。' }),
+      mk('cell phone', '手机', '单词', { word: 1 }),
+      mk('ID card', '身份证', '单词', { word: 1 }),
+      mk('Passengers must keep their phone in flight mode.', '旅客须将手机调为飞行模式。', '短语'),
+      mk('Please turn off your cell phone.', '请关闭您的手机。', '短语'),
+      mk('Please fasten your seat belt.', '请系好安全带。', '短语'),
+      mk('May I see your passport?', '请出示您的护照。', '短语'),
+      mk("Don't resist.", '不要反抗。', '短语'),
+      mk('Please remain seated.', '请保持坐好。', '短语')
+    ];
+    const run = q => { const r = searchRunOn(window.__corp, q); return { list: r.list.map(x => x.en), loose: r.loose.map(x => x.en) }; };
+    return { a: run('安全带'), b: run('seatbelt'), c: run('dont'), d: run('PASSPORT'), e: run('passports'), f: run('pasport'),
+             g: run('旅客不系安全带怎么说'), h: run('id'), i: run('手机'), j: run('zzzzqq'), k: run('不要'), l: run('seat belt'), m: run('boarded seats') };
+  });
+  check('搜「安全带」：释义整条匹配的单词排第一', S.a.list[0] === 'seat belt', S.a);
+  check('「seatbelt」连写也能找到「seat belt」', S.b.list.includes('Please fasten your seat belt.'), S.b);
+  check('「dont」能找到 Don\'t resist.', S.c.list[0] === "Don't resist.", S.c);
+  check('大小写不敏感，单词精确匹配排第一', S.d.list[0] === 'passport', S.d);
+  check('复数「passports」归到相近结果', S.e.list.length === 0 && S.e.loose.includes('passport') && S.e.loose.includes('May I see your passport?'), S.e);
+  check('拼错一个字母「pasport」归到相近结果', S.f.loose.includes('passport'), S.f);
+  check('整句描述「旅客不系安全带怎么说」找到安全带相关句', S.g.list.length === 0 && S.g.loose.includes('Please fasten your seat belt.') && S.g.loose.includes('seat belt'), S.g);
+  check('短词「id」不命中 provide', !S.h.list.includes('provide') && S.h.list.includes('ID card'), S.h);
+  check('搜「手机」：单词最前，更短更贴近的句子在更长的前面',
+    S.i.list[0] === 'cell phone' && S.i.list.indexOf('Please turn off your cell phone.') < S.i.list.indexOf('Passengers must keep their phone in flight mode.') && S.i.list.length === 3, S.i);
+  check('毫不相干的词什么都不返回', S.j.list.length === 0 && S.j.loose.length === 0, S.j);
+  check('搜「不要」命中「不要反抗」', S.k.list[0] === "Don't resist.", S.k);
+  check('「seat belt」完整句子靠前', S.l.list.slice(0, 2).sort().join('|') === ['Please fasten your seat belt.', 'seat belt'].sort().join('|'), S.l);
+  check('相近结果也有词干容错（boarded / seats）', S.m.loose.includes('Please remain seated.'), S.m);
 
   console.log('· 跟读录音');
   await ev(() => { phraseSession = { list: allPhrases().slice(0, 3), idx: 0, revealed: true, mode: 'study', cat: 't' }; navigate(renderPhraseFlash, 't', ''); });
