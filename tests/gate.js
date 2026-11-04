@@ -21,6 +21,11 @@ const CODE = 'WBTE-ABCD-EFGH-JKLM', CODE2 = 'WBT2-ABCD-EFGH-JKLM', TEMP = 'WBTT-
   let p = await open();
   await p.waitForSelector('#gateCode');
   check('首次打开显示邀请码输入页', true);
+  check('普通浏览器的进入页没有微信提示', await p.locator('.gate-wx').count() === 0);
+  const wctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 MicroMessenger/8.0.47.2560 NetType/WIFI' });
+  const wpg = await wctx.newPage(); await wpg.goto(base); await wpg.waitForSelector('#gateCode');
+  check('微信里的进入页提示换浏览器打开', await wpg.locator('.gate-wx').count() === 1 && /在浏览器打开/.test(await wpg.locator('.gate-wx').innerText()));
+  await wctx.close();
   await login(p, 'ABCD-ABCD-EFGH-JKLM');
   await p.waitForFunction(() => /不正确|停用/.test(document.getElementById('gateMsg').textContent), null, { timeout: 15000 });
   check('不存在的邀请码被拒绝', /不正确|停用/.test(await gateMsg(p)));

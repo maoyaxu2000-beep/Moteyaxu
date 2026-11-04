@@ -1149,3 +1149,17 @@ html[data-theme="dark"] .ex-token{background:#3a5694;}
 html[data-theme="dark"] :is(.ex-opt,.quiz-opt,.story-choice) .idx{background:rgba(255,255,255,.12);color:var(--text);}
 html[data-theme="dark"] .ex-opt.correct .idx,html[data-theme="dark"] .quiz-opt.correct .idx{background:var(--green2);color:#fff;}
 html[data-theme="dark"] .ex-opt.wrong .idx,html[data-theme="dark"] .quiz-opt.wrong .idx{background:#ef6f64;color:#fff;}
+
+/* ---- v5.1：微信引导、反馈 ---- */
+.gate-wx{margin-top:18px;padding:11px 14px;border-radius:14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);font-size:12px;line-height:1.7;color:rgba(255,255,255,.82);text-align:left;}
+.fb-link{display:table;margin:34rem auto 0;padding:16rem 30rem;border-radius:999px;font-size:12px;font-weight:650;color:var(--navy-800);background:rgba(255,255,255,.72);border:1rem solid var(--line);}
+.fb-link:active{transform:scale(.96);}
+.fb-mini{text-align:center;margin:10rem 0 0;font-size:11px;color:var(--muted);}
+.fb-mini span{display:inline-block;padding:10rem 16rem;text-decoration:underline;text-underline-offset:3px;}
+.fb-area{display:block;width:100%;box-sizing:border-box;height:380rem;margin-top:16rem;padding:16rem 18rem;border-radius:18rem;border:1rem solid var(--line);background:rgba(255,255,255,.7);font-family:inherit;font-size:16px;line-height:1.55;color:var(--text);resize:none;outline:none;}
+.fb-area:focus{border-color:var(--accent);}
+html[data-theme="dark"] .fb-link{background:rgba(24,36,64,.7);border-color:var(--glass-line);color:var(--text);}
+html[data-theme="dark"] .fb-area{background:rgba(10,16,32,.55);border-color:var(--glass-line);color:var(--text);}
+
+/* 弹窗卡片原来只有约 187px 宽（rem 按屏宽缩放），标题和按钮都挤得换行，放宽 */
+.modal-card{max-width:min(640rem,92vw);}

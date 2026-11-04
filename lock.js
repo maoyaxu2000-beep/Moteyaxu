@@ -139,6 +139,7 @@
   function showGate(msg, keys, retry){
     if(keys) gateKeys = keys;
     const g = gateEl();
+    const wx = /MicroMessenger|wxwork/i.test(navigator.userAgent);      // 微信里打开：提前提示换浏览器（进度不互通，越早换越省事）
     g.innerHTML = `<div class="gate-card">
       <img class="gate-logo" src="icon.svg" alt="">
       <div class="gate-title">五班英语角</div>
@@ -147,6 +148,7 @@
       <div class="gate-msg" id="gateMsg">${msg || ''}</div>
       <button class="gate-btn" id="gateBtn">${retry ? '重新进入' : '进入'}</button>
       <div class="gate-foot">邀请码请向单位管理员索取 · 仅限内部学习使用</div>
+      ${wx ? '<div class="gate-wx">你正在微信里打开。建议先点右上角「···」选「在浏览器打开」，再输入邀请码——微信里学习记录容易丢失，也无法添加到主屏幕。</div>' : ''}
     </div>`;
     const inp = document.getElementById('gateCode');
     inp.addEventListener('input', () => {                       // 自动补横杠：WBRL-XC2K-…

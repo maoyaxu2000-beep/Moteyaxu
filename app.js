@@ -234,9 +234,12 @@ function paint(keep){
   document.getElementById('tabbar').style.display = cur.sub? 'none':'flex';
   if(typeof markPlaying==='function') markPlaying();
   /* 语速悬浮钮只在可能有朗读的页面出现，首页和「我的」不需要 */
-  const sw=document.querySelector('.speed-widget-wrap');
-  if(sw) sw.style.display = ((!cur.sub && (curTab==='home'||curTab==='me')) || (typeof noSpeedPage==='function' && noSpeedPage(cur.render))) ? 'none' : '';
+  syncSpeedWidget();
   window.scrollTo(0,y);
+}
+function syncSpeedWidget(){
+  const sw=document.querySelector('.speed-widget-wrap'), cur=stack[stack.length-1];
+  if(sw && cur) sw.style.display = ((!cur.sub && (curTab==='home'||curTab==='me')) || (typeof noSpeedPage==='function' && noSpeedPage(cur.render))) ? 'none' : '';
 }
 function buildTabbar(){
   const tb = document.getElementById('tabbar');
@@ -280,7 +283,7 @@ function renderHome(){
     week+=`<div class="week-day ${done?'done':''} ${today?'today':''}"><span class="week-label">${'一二三四五六日'[i]}</span><div class="week-dot">${done?icon('check'):''}</div></div>`; }
   return `
   <div class="view">
-    ${installBannerHtml()}
+    ${typeof topBannerHtml==='function'?topBannerHtml():installBannerHtml()}
     <div class="search-pill" onclick="openSearch()">${icon('search')}<span>执勤速查 · 输入中文或英文，一秒找到整句</span></div>
     <div class="welcome-card">
       <div class="welcome-top">
@@ -493,6 +496,7 @@ function renderFlash(){
           <div class="flash-eg-cn">${esc(w.exampleCn||'')}</div>
         </div>` : `<div class="tap-hint">点击卡片查看释义</div>` }
     </div>
+    ${s.revealed && typeof fbLink==='function' ? fbLink(w.word, w.meaning) : ''}
     <div class="flash-actions">
       ${reviewMode
         ? `<button class="btn ghost" onclick="removeWrong()">✓ 已掌握移除</button><button class="btn gold" onclick="nextWord()">下一个 ›</button>`
@@ -877,7 +881,7 @@ function renderMe(){
         <span class="badge-cnt">支持离线使用</span>
       </div>
       <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:${isStandalone()?'0':'14rem'}">全部单词、闯关关卡、情景剧本已缓存到本机；打卡、经验值、生词本等学习进度均保存在本机，没有信号也能继续学习。</div>
-      ${isStandalone()? '' : `<button class="btn gold" onclick="installApp()">安装到主屏幕，随时离线打开</button>`}
+      ${isStandalone()? '' : `<button class="btn gold" onclick="installApp()">${(typeof isWeChat==='function'&&isWeChat())?'先在浏览器里打开，才能安装到主屏幕':'安装到主屏幕，随时离线打开'}</button>`}
     </div>
     <div class="daily-list" style="margin-top:20rem;grid-template-columns:repeat(3,1fr);">
       <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text)">${studied}</div><div style="font-size:11px;color:var(--muted)">已学单词</div></div>
@@ -908,6 +912,7 @@ function renderMe(){
     <div class="list-item arrow-item" onclick="openQuiz()"><div class="play p-pink">Q</div><div class="li-main"><div class="li-en">单词测试</div><div class="li-cn">检验学习成果</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openChat()"><div class="play p-violet">${icon('robot')}</div><div class="li-main"><div class="li-en">答疑小助手</div><div class="li-cn">本地智能检索</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="openBackup()"><div class="play p-blue">${icon('download')}</div><div class="li-main"><div class="li-en">进度备份与恢复</div><div class="li-cn">${lastBackupText()}</div></div><span class="func-arrow">›</span></div>
+    <div class="list-item arrow-item" onclick="openFeedback('idea')"><div class="play p-teal">${icon('talk')}</div><div class="li-main"><div class="li-en">意见反馈</div><div class="li-cn">缺词、纠错、建议，一键复制发给管理员</div></div><span class="func-arrow">›</span></div>
     <div class="list-item arrow-item" onclick="accessLogout()"><div class="play p-slate">${icon('lock')}</div><div class="li-main"><div class="li-en">退出 / 更换邀请码</div><div class="li-cn">${accessNote()}</div></div><span class="func-arrow">›</span></div>
     <div class="links">
       <span onclick="resetCheckin()">重置打卡</span>·<span onclick="resetProgress()">重置闯关进度</span>·<span onclick="clearWrong()">清空生词本</span>·<span onclick="openAbout()">关于与诊断</span>
@@ -935,6 +940,7 @@ window.addEventListener('beforeinstallprompt', e=>{
 });
 function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
 function installApp(){
+  if(typeof isWeChat==='function' && isWeChat()){ showWeChatGuide(); return; }   // 微信里装不了，先引导到浏览器
   if(deferredInstallPrompt){
     deferredInstallPrompt.prompt();
     deferredInstallPrompt.userChoice.then(()=>{ deferredInstallPrompt=null; refresh(); });
@@ -962,6 +968,7 @@ function showIOSInstallGuide(){
 }
 function installBannerHtml(){
   if(isStandalone() || LS.get('installBannerDismissed',false)) return '';
+  if(typeof isWeChat==='function' && isWeChat()) return '';   // 微信里由「在浏览器打开」的提示接管
   const ios=isIOS();
   return `<div class="install-banner">
     <div class="install-banner-ic">${icon('plane')}</div>
@@ -999,4 +1006,5 @@ function initSpeedControl(){
     <div class="speed-fab" id="speedFab" onclick="toggleSpeedPanel()">${icon('speaker')}<span id="speedFabLabel">${rateLabel(rate)}</span></div>
   `;
   document.body.appendChild(wrap);
+  syncSpeedWidget();      // 首页第一次绘制发生在它创建之前：补一次，否则首页会多出一个悬浮的语速钮
 }

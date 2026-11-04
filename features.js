@@ -178,7 +178,7 @@ function renderSrs(){
       ${s.revealed ? `<div class="flash-reveal"><div class="phrase-a speakable" onclick="event.stopPropagation();speak(${jsAttr(p.en)})">${esc(p.en)}</div><div class="phrase-cn">${esc(p.cn)}</div></div>`
         : `<div class="tap-hint">听一遍，想想是什么意思，再点「显示答案」</div>`}`;
   }
-  const extra = (s.revealed && it.type !== 'w' && typeof lineTools === 'function') ? lineTools(it.p.en, it.p.cn) : '';
+  const extra = !s.revealed ? '' : it.type !== 'w' ? lineTools(it.p.en, it.p.cn) : fbLink(it.w.word, it.w.meaning);
   return `<div class="view">
     <div class="progress-txt"><span>${s.idx + 1} / ${s.list.length}</span><span>${SRS_LABEL[it.type]}复习</span></div>
     <div class="progress-bar"><i style="width:${pct}%"></i></div>
@@ -277,7 +277,7 @@ function lineTools(en, cn){
     <span class="lt-btn fav${on ? ' on' : ''}" data-fk="${favKey(en)}" ${lnData(en, cn)} role="button" onclick="toggleFav(this)">${icon('star')}<i>收藏</i></span>
     <span class="lt-btn" ${lnData(en, cn)} role="button" onclick="showCardEl(this)">${icon('expand')}<i>给旅客看</i></span>
     ${typeof recToolBtn === 'function' ? recToolBtn(en) : ''}
-  </div>`;
+  </div>${fbLink(en, cn)}`;
 }
 function toggleFav(el){
   const en = el.dataset.en, cn = el.dataset.cn, k = favKey(en);
@@ -545,10 +545,11 @@ function searchRender(v){
   const box = document.getElementById('sRes'); if(!box) return;
   const r = searchRun(v);
   if(!r.terms.length){ box.innerHTML = searchIdle(); return; }
-  if(!r.list.length && !r.loose.length){ box.innerHTML = `<div class="empty" style="padding:60rem 0"><span class="big">${icon('search')}</span>没有找到「${esc(v)}」<br><span style="font-size:12px">换个说法试试，或只输入一个关键词</span></div>`; return; }
+  if(!r.list.length && !r.loose.length){ box.innerHTML = `<div class="empty" style="padding:60rem 0"><span class="big">${icon('search')}</span>没有找到「${esc(v)}」<br><span style="font-size:12px">换个说法试试，或只输入一个关键词</span></div><span class="fb-link" onclick="openFeedback('miss',${jsAttr(v.trim())})">告诉管理员，请他补上这个说法</span>`; return; }
   let html = '';
   if(r.list.length) html += (r.total > r.list.length ? `<div class="sr-title">找到 ${r.total} 条，显示前 ${r.list.length} 条</div>` : `<div class="sr-title">找到 ${r.total} 条</div>`) + r.list.map(it => searchRow(it, r.terms)).join('');
   if(r.loose.length) html += `<div class="sr-title">${r.list.length ? '相近的结果' : '没有完全一致的，下面是意思相近的'}</div>` + r.loose.map(it => searchRow(it, searchLooseMarks(it, r))).join('');
+  html += `<span class="fb-link" onclick="openFeedback('miss',${jsAttr(v.trim())})">没找到想要的说法？告诉管理员</span>`;
   box.innerHTML = html;
   markPlaying();
 }
@@ -812,7 +813,7 @@ function diagText(){
     `缓存版本：${aboutInfo.cache}`,
     `内容密钥编号：${a.kid || '-'}　邀请码编号：${a.codeId || '-'}`,
     `在线：${navigator.onLine ? '是' : '否'}　主屏幕模式：${isStandalone() ? '是' : '否'}　离线服务：${aboutInfo.sw || '-'}`,
-    `外观：${themePref()}（当前 ${themeEffective()}）`,
+    `外观：${themePref()}（当前 ${themeEffective()}）　微信内打开：${isWeChat() ? '是' : '否'}`,
     `存储：${aboutInfo.storage || '-'}`,
     `屏幕：${screen.width}x${screen.height} @${window.devicePixelRatio || 1}　视口：${innerWidth}x${innerHeight}`,
     `学习记录：单词 ${LS.get('studiedWords', []).length} · 短语 ${LS.get('studiedPhrases', []).length} · 复习计划 ${s.total}（到期 ${s.due}）· 收藏 ${favList().length}`,
@@ -1052,3 +1053,104 @@ async function posterShare(){
   const a = document.createElement('a'); a.href = posterUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   toast('已保存；微信里请长按图片保存');
 }
+
+
+/* =========================================================
+   6. 微信内置浏览器适配 · 备份提醒
+   同事多半是在微信里点链接打开的：微信里没有「添加到主屏幕」，本地数据也更容易丢，
+   换到浏览器后还要重新输入邀请码——所以尽早引导，并给一条「先备份、再迁移」的路。
+========================================================= */
+const DAY_MS = 86400000;
+function isWeChat(){ return /MicroMessenger|wxwork/i.test(navigator.userAgent); }
+try{ if(!LS.get('firstUse', 0)) LS.set('firstUse', Date.now()); }catch(e){}   // 备份提醒从「第一次使用」起算，新用户不会一上来就被催
+
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }catch(e){}
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-999px;top:0;font-size:16px';
+  document.body.appendChild(ta); ta.select(); try{ ta.setSelectionRange(0, text.length); }catch(e){}
+  let ok = false; try{ ok = document.execCommand('copy'); }catch(e){}
+  ta.remove(); return ok;
+}
+function pageUrl(){ return location.href.split('#')[0].split('?')[0]; }
+
+function wxBannerHtml(){
+  if(!isWeChat() || isStandalone()) return '';
+  if(Date.now() - LS.get('wxTipAt', 0) < 3 * DAY_MS) return '';
+  return `<div class="install-banner wx-banner" onclick="showWeChatGuide()">
+    <div class="install-banner-ic">${icon('share')}</div>
+    <div class="install-banner-text"><b>建议用浏览器打开本站</b><span>微信里学习记录容易丢，也不能添加到主屏幕</span></div>
+    <button class="install-banner-btn">怎么做</button>
+    <span class="install-banner-close" onclick="wxDismiss(event)">×</span>
+  </div>`;
+}
+function wxDismiss(e){ if(e) e.stopPropagation(); LS.set('wxTipAt', Date.now()); refresh(); }
+function showWeChatGuide(){
+  if(document.getElementById('wxGuideMask')) return;
+  const d = document.createElement('div'); d.id = 'wxGuideMask'; d.className = 'modal-mask';
+  d.onclick = e => { if(e.target === d) closeWeChatGuide(); };
+  const step = (n, t, sub) => `<div class="modal-step"><div class="modal-step-ic" style="font-weight:800;font-size:15px">${n}</div><div class="modal-step-txt"><b>${t}</b><div class="modal-step-sub">${sub}</div></div></div>`;
+  d.innerHTML = `<div class="modal-card">
+    <div class="modal-title">在浏览器里打开更稳妥</div>
+    ${step(1, '点右上角「···」', '微信右上角的三个点')}
+    ${step(2, '选「在浏览器打开」', 'iPhone 上也可能叫「在 Safari 中打开」「在默认浏览器打开」')}
+    ${step(3, '再添加到主屏幕', '之后像 App 一样直接打开，学习记录也更稳')}
+    <div class="modal-step-sub" style="margin:0 0 14rem;line-height:1.7">已经在微信里学过了？先点下面的「备份进度」，到浏览器里打开「我的 → 进度备份与恢复」粘贴就能带过去。浏览器里需要重新输入一次邀请码。</div>
+    <button class="btn gold" onclick="closeWeChatGuide();openBackup()">备份进度</button>
+    <button class="btn ghost" onclick="wxCopyUrl()">复制网址（粘贴到浏览器）</button>
+    <button class="btn ghost" onclick="closeWeChatGuide()">知道了</button>
+  </div>`;
+  document.body.appendChild(d);
+}
+function closeWeChatGuide(){ const m = document.getElementById('wxGuideMask'); if(m) m.remove(); LS.set('wxTipAt', Date.now()); }
+async function wxCopyUrl(){ toast((await copyText(pageUrl())) ? '网址已复制，粘贴到浏览器地址栏打开' : '复制失败，请点右上角「···」选「在浏览器打开」'); }
+
+/* 超过一周没备份（已添加到主屏幕的放宽到两周），且已经有一定学习进度，首页提醒一次；关掉后 3 天内不再出现 */
+function backupNudgeHtml(){
+  const prog = LS.get('studiedWords', []).length + LS.get('studiedPhrases', []).length + Object.keys(LS.get('drillMastery', {})).length;
+  if(prog < 15) return '';
+  const now = Date.now(), lb = LS.get('lastBackup', 0), last = Math.max(lb, LS.get('firstUse', now));
+  if(now - last < (isStandalone() ? 14 : 7) * DAY_MS) return '';
+  if(now - LS.get('backupNudgeAt', 0) < 3 * DAY_MS) return '';
+  const days = Math.floor((now - last) / DAY_MS);
+  return `<div class="install-banner" onclick="openBackup()">
+    <div class="install-banner-ic">${icon('download')}</div>
+    <div class="install-banner-text"><b>${lb ? `已 ${days} 天没备份进度` : '学习进度还没备份过'}</b><span>换手机、清理浏览器都会丢 · 30 秒就能备份</span></div>
+    <button class="install-banner-btn">去备份</button>
+    <span class="install-banner-close" onclick="nudgeDismiss(event)">×</span>
+  </div>`;
+}
+function nudgeDismiss(e){ if(e) e.stopPropagation(); LS.set('backupNudgeAt', Date.now()); refresh(); }
+/* 首页顶部同一时间只露一条提示：微信引导 > 安装到主屏幕 > 备份提醒 */
+function topBannerHtml(){ return wxBannerHtml() || installBannerHtml() || backupNudgeHtml(); }
+
+/* =========================================================
+   7. 反馈 / 纠错
+   没有服务器，所以做成「写好一段话 → 一键复制 → 粘贴到微信发给管理员」。
+   文字完整显示在输入框里，使用者可以先改、先删（包括末尾的版本和邀请码编号）再复制。
+========================================================= */
+function fbFooter(){ const a = window.ACCESS || {}; return `—\n五班英语角 v${APP_VERSION}${a.codeId ? ' · 编号 ' + a.codeId : ''}`; }
+function openFeedback(kind, a, b){
+  closeFeedback();
+  const body = kind === 'miss' ? `【缺词】想查「${a}」，没有搜到。\n使用场景：`
+    : kind === 'fix' ? `【纠错】\n英文：${a}\n中文：${b || ''}\n哪里不对：`
+    : '【意见】\n';
+  const d = document.createElement('div'); d.id = 'fbMask'; d.className = 'modal-mask';
+  d.onclick = e => { if(e.target === d) closeFeedback(); };
+  d.innerHTML = `<div class="modal-card fb-card">
+    <div class="modal-title" style="margin-bottom:10rem">反馈给管理员</div>
+    <div class="bk-sub" style="margin:0;text-align:center">开头已写好，补充几个字就行。点「复制」，到微信里粘贴发出去。</div>
+    <textarea id="fbText" class="fb-area" spellcheck="false">${esc(body + '\n\n' + fbFooter())}</textarea>
+    <div class="bk-row"><button class="btn gold" onclick="fbCopy()">${icon('copy')} 复制</button><button class="btn ghost" onclick="closeFeedback()">取消</button></div>
+  </div>`;
+  document.body.appendChild(d);
+}
+function closeFeedback(){ const m = document.getElementById('fbMask'); if(m) m.remove(); }
+async function fbCopy(){
+  const t = document.getElementById('fbText'); if(!t) return;
+  if(await copyText(t.value)){ closeFeedback(); toast('已复制，去微信粘贴发给管理员'); }
+  else { t.focus(); t.select(); toast('请长按文字，选「全选」→「拷贝」'); }
+}
+function feedbackEl(el){ openFeedback('fix', el.dataset.en, el.dataset.cn); }
+/* 句子 / 单词下方的小字入口 */
+function fbLink(en, cn){ return `<div class="fb-mini"><span ${lnData(en, cn)} role="button" onclick="feedbackEl(this)">发现错误？点此纠错</span></div>`; }
