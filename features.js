@@ -873,7 +873,7 @@ function checkUpdate(){
 }
 
 /* 没有朗读内容的页面不显示语速悬浮钮，免得挡住文字 */
-function noSpeedPage(r){ return r === renderBackup || r === renderAbout; }
+function noSpeedPage(r){ return r === renderBackup || r === renderAbout || r === renderOffline; }
 
 /* =========================================================
    4a. 跟读录音对比
@@ -1154,3 +1154,133 @@ async function fbCopy(){
 function feedbackEl(el){ openFeedback('fix', el.dataset.en, el.dataset.cn); }
 /* 句子 / 单词下方的小字入口 */
 function fbLink(en, cn){ return `<div class="fb-mini"><span ${lnData(en, cn)} role="button" onclick="feedbackEl(this)">发现错误？点此纠错</span></div>`; }
+
+
+/* =========================================================
+   8. 离线语音包
+   语音默认「播过一次才缓存」，没播过的句子断网就没声音（境外过夜、飞行模式下最需要）。
+   这里提供一键下载：只下载当前口音（英音或美音）的全部语音，约 25 MB，边下边存，可暂停、可继续、可清除。
+   缓存的仍是密文（和 sw.js 里的语音缓存是同一个），播放时照旧用本机密钥解密。
+========================================================= */
+const OFFL_CACHE = 'wuban-audio-v2';        // 与 sw.js 的 AUDIO_CACHE 保持一致
+const OFFL_AVG = 14200;                      // 平均每条语音约 14 KB，仅用于估算「还需多少 MB」
+let offl = { running: false, cancel: false, have: null, total: 0, done: 0, fail: 0, todo: 0, err: '', wake: null };
+
+function offlAcc(){ return voiceAccent() === 'US' ? 'us' : 'gb'; }
+function offlAbs(u){ return new URL(u, location.href).href; }
+/* 当前口音需要的全部语音地址（主音色 + 对话里「另一方」的音色） */
+function offlList(){
+  const acc = offlAcc(), idx = window.AUDIO_IDX || {}, kid = window.ACCESS && window.ACCESS.kid, out = [];
+  [acc, acc + '2'].forEach(set => String(idx[set] || '').split(',').filter(Boolean).forEach(k => out.push(`audio/${set}/${k}.bin?k=${kid}`)));
+  return out;
+}
+/* 数一下已经存了多少；顺手清掉旧密钥编号留下的文件（管理员换过主密钥后，旧文件永远用不上了） */
+async function offlRefresh(){
+  try{
+    if(!('caches' in window)) throw new Error('nocache');
+    const kid = window.ACCESS && window.ACCESS.kid;
+    if(!kid){ offl.total = 0; offl.have = 0; offlRepaint(); return; }       // 没有密钥编号就不清理，免得误删
+    const c = await caches.open(OFFL_CACHE), keys = await c.keys(), have = new Set();
+    for(const r of keys){
+      const u = new URL(r.url);
+      if(/\/audio\/[a-z0-9]+\/[0-9a-f]{8}\.bin$/.test(u.pathname) && u.searchParams.get('k') !== String(kid)) await c.delete(r);
+      else have.add(r.url);
+    }
+    const list = offlList().map(offlAbs);
+    offl.total = list.length; offl.have = list.filter(u => have.has(u)).length; offl.err = offl.err === 'nocache' ? '' : offl.err;
+    if(list.length && offl.have === list.length) LS.set('offlPack', { acc: offlAcc(), kid: String(kid), t: Date.now() });
+  }catch(e){ offl.have = null; offl.err = 'nocache'; }
+  offlRepaint();
+}
+function offlDone(){ const o = LS.get('offlPack', null); return !!(o && o.acc === offlAcc() && window.ACCESS && o.kid === String(window.ACCESS.kid)); }
+function offlRepaint(){ const t = stack[stack.length - 1]; if(t && t.render === renderOffline) refresh(); }
+function openOffline(){ navigate(renderOffline, '离线语音包', ''); offlRefresh(); }
+
+function offlMB(n){ return (n * OFFL_AVG / 1048576).toFixed(n * OFFL_AVG < 10485760 ? 1 : 0); }
+function renderOffline(){
+  const accName = voiceAccent() === 'US' ? '美音' : '英音', total = offl.total, have = offl.have;
+  const cur = have == null ? 0 : have + (offl.running ? offl.done : 0), pct = total ? Math.min(100, Math.round(cur / total * 100)) : 0;
+  const complete = total > 0 && cur >= total, left = Math.max(0, total - cur);
+  let main;
+  if(!total) main = `<div class="off-note" style="margin-top:0">语音目录还没加载好，稍等一下再点进来。</div>`;
+  else if(offl.running) main = `<button class="btn ghost" onclick="offlPause()">暂停</button>`;
+  else if(complete) main = `<div class="off-ok">${icon('check')}<span>已全部下载，没有网络也能听真人语音</span></div>`;
+  else main = `<button class="btn gold" onclick="offlStart()">${cur ? '继续下载' : '下载语音包'}（还需约 ${offlMB(left)} MB）</button>`;
+  const warns = [];
+  if(offl.err === 'quota') warns.push('手机存储空间不够了，清理一些空间后点「继续下载」。');
+  else if(offl.err === 'nocache') warns.push('当前浏览器不支持离线缓存，无法下载语音包。');
+  else if(offl.fail && !offl.running && !complete) warns.push(`有 ${offl.fail} 条没下载成功（网络不稳），点「继续下载」再试一次。`);
+  if(isWeChat()) warns.push('微信里的缓存很容易被清掉，建议在浏览器（最好是添加到主屏幕后）里下载。');
+  else if(isIOS() && !isStandalone()) warns.push('iPhone 上建议先「添加到主屏幕」再下载，语音更不容易被系统清理。');
+  return `<div class="view">
+    <div class="card">
+      <div class="bk-title">${accName}语音 · ${total || '-'} 条</div>
+      <div class="off-stat"><span id="offTxt">${total ? `${cur} / ${total}` : '-'}</span> <small id="offPct">${total ? pct + '%' : ''}</small></div>
+      <div class="off-bar"><i id="offBar" style="width:${pct}%"></i></div>
+      <div id="offMain" style="margin-top:22rem">${main}</div>
+      ${warns.map(w => `<div class="off-warn">${esc(w)}</div>`).join('')}
+      <div class="off-note">建议连 Wi-Fi 下载，下载时请保持屏幕亮着。<br>没下载的句子会自动改用手机自带朗读，音质差一些；切换英音 / 美音后需要再下载另一种。</div>
+    </div>
+    ${have ? `<div class="card" style="margin-top:20rem"><div class="bk-title">释放空间</div><div class="bk-sub">删掉已下载的语音，之后播放时需要联网重新获取。</div><div class="bk-row"><button class="btn ghost" onclick="offlClear()">清除已下载的语音</button></div></div>` : ''}
+    <div class="safe"></div></div>`;
+}
+/* 下载过程中只更新进度条，不整页重绘 */
+function offlTick(){
+  const total = offl.total, cur = (offl.have || 0) + offl.done, pct = total ? Math.min(100, Math.round(cur / total * 100)) : 0;
+  const t = document.getElementById('offTxt'), p = document.getElementById('offPct'), b = document.getElementById('offBar');
+  if(t) t.textContent = `${cur} / ${total}`; if(p) p.textContent = pct + '%'; if(b) b.style.width = pct + '%';
+}
+const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+async function offlStart(){
+  if(offl.running) return;
+  if(!window.ACCESS){ toast('请先输入邀请码'); return; }
+  if(!('caches' in window)){ offl.err = 'nocache'; offlRepaint(); return; }
+  if(!navigator.onLine){ toast('现在没有网络，连上网再下载'); return; }
+  if(!offl.total) await offlRefresh();
+  const todoN = offl.total - (offl.have || 0); if(todoN <= 0) return;
+  const conn = navigator.connection;
+  if(conn && (conn.saveData || conn.type === 'cellular') && !confirm(`当前可能在使用手机流量，还需下载约 ${offlMB(todoN)} MB，继续吗？`)) return;
+  offl.running = true; offl.cancel = false; offl.done = 0; offl.fail = 0; offl.err = '';
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+  try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l => { if(offl.running) offl.wake = l; else l.release().catch(() => {}); }).catch(() => {}); }catch(e){}
+  offlRepaint();
+  try{
+    const c = await caches.open(OFFL_CACHE), have = new Set((await c.keys()).map(r => r.url));
+    const todo = offlList().filter(u => !have.has(offlAbs(u)));
+    let i = 0;
+    const worker = async () => {
+      while(!offl.cancel){
+        const u = todo[i++]; if(!u) return;
+        let ok = false;
+        for(let t = 0; t < 3 && !ok && !offl.cancel; t++){
+          try{
+            const r = await fetch(u);
+            if(r.ok){ await c.put(u, r); ok = true; }
+            else if(r.status === 404) break;                 // 服务器上就没有这个文件，重试也没用
+          }catch(e){
+            if(e && e.name === 'QuotaExceededError'){ offl.err = 'quota'; offl.cancel = true; break; }
+            await sleepMs(500 * (t + 1));
+          }
+        }
+        if(ok) offl.done++; else if(!offl.cancel) offl.fail++;
+        if((offl.done + offl.fail) % 8 === 0) offlTick();
+      }
+    };
+    await Promise.all(Array.from({ length: 4 }, worker));
+  }catch(e){ offl.err = e && e.name === 'QuotaExceededError' ? 'quota' : offl.err; }
+  const finished = !offl.cancel && !offl.err;
+  offl.running = false;
+  try{ if(offl.wake){ offl.wake.release(); offl.wake = null; } }catch(e){}
+  await offlRefresh();
+  if(offl.have === offl.total && offl.total) toast('离线语音已全部下载完成');
+  else if(finished && offl.fail) toast(`有 ${offl.fail} 条没下载成功，可以点「继续下载」重试`);
+}
+function offlPause(){ offl.cancel = true; toast('已暂停，已下载的会保留'); }
+async function offlClear(){
+  if(!confirm('清除已下载的语音？之后播放时需要联网重新获取。')) return;
+  try{ await caches.delete(OFFL_CACHE); }catch(e){}
+  LS.set('offlPack', null); offl.have = 0; offl.done = 0; offl.fail = 0; offl.err = '';
+  await offlRefresh(); toast('已清除');
+}
+/* 「我的」页里的提示文字 */
+function offlSub(){ return offlDone() ? `已下载（${voiceAccent() === 'US' ? '美音' : '英音'}）· 断网也能听` : '未下载 · 约 25 MB · 断网也能听真人语音'; }

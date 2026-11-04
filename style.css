@@ -1163,3 +1163,15 @@ html[data-theme="dark"] .fb-area{background:rgba(10,16,32,.55);border-color:var(
 
 /* 弹窗卡片原来只有约 187px 宽（rem 按屏宽缩放），标题和按钮都挤得换行，放宽 */
 .modal-card{max-width:min(640rem,92vw);}
+
+/* ---- v5.2：离线语音包 ---- */
+.off-stat{font-size:24px;font-weight:800;margin-top:10rem;color:var(--text);font-variant-numeric:tabular-nums;}
+.off-stat small{font-size:12px;font-weight:650;color:var(--muted);margin-left:6rem;}
+.off-bar{height:18rem;border-radius:999px;background:rgba(120,130,160,.2);overflow:hidden;margin-top:18rem;}
+.off-bar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#ffc860,#f0a82e);transition:width .25s ease;}
+.off-ok{display:flex;align-items:center;gap:12rem;font-size:13px;font-weight:700;color:#1f8a5b;}
+.off-ok .icon{width:36rem;height:36rem;stroke-width:2.4;flex-shrink:0;}
+.off-warn{margin-top:16rem;padding:14rem 18rem;border-radius:14rem;background:rgba(240,168,46,.16);color:#8a5a06;font-size:12px;line-height:1.7;}
+.off-note{font-size:12px;color:var(--muted);line-height:1.8;margin-top:20rem;}
+html[data-theme="dark"] .off-ok{color:#5fd6a0;}
+html[data-theme="dark"] .off-warn{background:rgba(240,168,46,.14);color:#f3c77a;}

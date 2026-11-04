@@ -1,5 +1,6 @@
 /* 冒烟测试：用模拟内容打开测试页，走一遍主要功能。运行：node tests/smoke.js */
 const { serve, launch, check, done } = require('./lib');
+const fs = require('fs'), path = require('path');
 
 (async () => {
   const srv = await serve(8123);
@@ -8,7 +9,7 @@ const { serve, launch, check, done } = require('./lib');
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('requestfailed', r => { if(process.env.DEBUG_REQ) console.log('   [requestfailed]', r.url().slice(0, 100), r.failure() && r.failure().errorText); });
-  page.on('console', m => { if(m.type() === 'error') errors.push(m.text()); });
+  page.on('console', m => { if(m.type() === 'error' && !/deadbeef/.test((m.location() || {}).url || '')) errors.push(m.text()); });   // deadbeef：离线语音包测试里故意放的不存在的文件
   const url = 'http://127.0.0.1:8123/tests/harness.html';
   const ev = (fn, arg) => page.evaluate(fn, arg);
 
@@ -255,6 +256,46 @@ const { serve, launch, check, done } = require('./lib');
   await ev(() => switchTab('me'));
   check('我的页有备份、收藏、外观入口', await page.locator('text=进度备份与恢复').count() >= 1 && await page.locator('text=我的收藏').count() >= 1 && await page.locator('text=跟随系统').count() === 1);
   await ev(() => switchTab('home'));
+
+  console.log('· 离线语音包');
+  const names = fs.readdirSync(path.join(__dirname, '..', 'audio', 'gb')).slice(0, 12).map(f => f.replace('.bin', ''));
+  await ev(([names]) => { window.__ACC0 = window.ACCESS; window.ACCESS = { kid: 'tk' }; window.AUDIO_IDX = { gb: names.join(',') + ',deadbeef', gb2: '', us: names.slice(0, 5).join(','), us2: '' }; LS.set('voiceAccent', 'GB'); }, [names]);
+  await ev(async () => { await caches.delete('wuban-audio-v2'); const c = await caches.open('wuban-audio-v2'); await c.put('audio/gb/00000000.bin?k=old', new Response('x')); });
+  await ev(() => openOffline());
+  await page.waitForFunction(() => offl.total === 13 && offl.have === 0);
+  check('下载页显示「0 / 13」（当前口音）', (await page.locator('#offTxt').innerText()) === '0 / 13');
+  check('旧密钥编号留下的缓存被清掉', await ev(async () => (await (await caches.open('wuban-audio-v2')).keys()).length === 0));
+  await page.locator('button:has-text("下载语音包")').click();
+  await page.waitForFunction(() => !offl.running && offl.have === 12, null, { timeout: 15000 });
+  check('下载了 12 条，1 条（服务器上没有）记为失败', await ev(() => offl.fail === 1 && offl.have === 12));
+  check('进度显示 12 / 13 并提示可继续', (await page.locator('#offTxt').innerText()) === '12 / 13' && await page.locator('.off-warn:has-text("1 条没下载成功")').count() === 1 && await page.locator('button:has-text("继续下载")').count() === 1);
+  check('缓存里是带密钥编号的地址', await ev(async () => { const k = await (await caches.open('wuban-audio-v2')).keys(); return k.length === 12 && k.every(r => r.url.endsWith('?k=tk')); }));
+  await ev(() => { window.AUDIO_IDX.gb = window.AUDIO_IDX.gb.replace(',deadbeef', ''); return offlRefresh(); });
+  await page.waitForSelector('.off-ok');
+  check('全部下载后显示完成，并记下已下载', await ev(() => offlDone()) && (await page.locator('#offTxt').innerText()) === '12 / 12');
+  await ev(() => switchTab('me'));
+  check('「我的」里显示已下载（英音）', await page.locator('text=已下载（英音）').count() === 1);
+  await ev(() => { LS.set('voiceAccent', 'US'); return offlRefresh(); });
+  check('换成美音后需要另行下载', !(await ev(() => offlDone())) && await ev(() => offl.total === 5 && offl.have === 0));
+  /* 暂停 / 继续：把网络请求放慢一点，下载到一半暂停 */
+  await ev(([names]) => { window.AUDIO_IDX.us = names.join(','); window.__f = window.fetch; window.fetch = (...a) => new Promise(r => setTimeout(() => r(window.__f(...a)), 150)); return offlRefresh(); }, [names]);
+  await ev(() => { openOffline(); });
+  await page.waitForFunction(() => offl.total === 12 && offl.have === 0);
+  await ev(() => { offlStart(); });
+  await page.waitForFunction(() => offl.running && offl.done >= 1);
+  await ev(() => offlPause());
+  await page.waitForFunction(() => !offl.running, null, { timeout: 15000 });
+  const part = await ev(() => offl.have);
+  check('暂停后保留已下载的部分，不是 0 也没下完', part > 0 && part < 12, part);
+  await ev(() => offlStart());
+  await page.waitForFunction(() => !offl.running && offl.have === 12, null, { timeout: 20000 });
+  check('继续后补齐剩余', await ev(() => offlDone()));
+  await ev(() => { window.fetch = window.__f; });
+  page.once('dialog', d => d.accept());
+  await page.locator('button:has-text("清除已下载的语音")').click();
+  await page.waitForFunction(() => offl.have === 0, null, { timeout: 5000 });
+  check('清除后缓存清空、状态复位', await ev(async () => (await (await caches.open('wuban-audio-v2')).keys()).length === 0 && !offlDone()));
+  await ev(() => { window.ACCESS = window.__ACC0; delete window.AUDIO_IDX; LS.set('voiceAccent', 'GB'); LS.set('offlPack', null); switchTab('home'); });
 
   console.log('· 备份提醒');
   const keep = await ev(() => ({ w: LS.get('studiedWords', []), p: LS.get('studiedPhrases', []), d: LS.get('drillMastery', {}) }));
